@@ -1,0 +1,1 @@
+insert into wyp_bak_2 select id,name,age,tel from wyp ;

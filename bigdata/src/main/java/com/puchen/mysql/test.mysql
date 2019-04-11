@@ -1,0 +1,7 @@
+DELIMITER $
+CREATE PROCEDURE mysql()
+DEGIN
+	INSERT INTO user(id,name)
+	values(1,'2'),(1,'2'),(1,'2'),(1,'2'),(1,'2');
+END $
+call mysql()
