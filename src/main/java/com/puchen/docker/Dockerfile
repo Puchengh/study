@@ -15,5 +15,4 @@ docker run -p 3306:3306 --name mysql \
 #将容器中的mysql复制到本地（宿主文件中）
 docker cp mysql:/etc/mysql .
 
-
-。。。
+000000000000000
