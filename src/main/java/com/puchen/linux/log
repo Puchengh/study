@@ -1,0 +1,5 @@
+lastb  记录登陆日志
+/var/log/cups 记录的是打印日志
+/var/log/dmesg  记录系统在开机时那可自检的信息 也可以直接使用dmesg
+/var/log/lastlog  记录用户登录的最后一次的时间
+/var/log/message  记录的是所有的信息
