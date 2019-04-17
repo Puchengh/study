@@ -1,4 +1,4 @@
-package com.shxy.rest.modular.duty;
+package com.shxy.rest.modular.course.commons;
 import java.io.*;
 import java.util.ArrayList;
 import java.util.List;
@@ -12,8 +12,8 @@ public class test {
         List<String> list1 = readFile(path1);
         List<String> list2 = readFile(path2);
         for (int i=0;i< list1.size();i++ ){
-            System.out.println("update set app_unique = "+ "'" + list1.get(i) + "'" +
-                    " sys_res where res_name = " + "'" + list2.get(i) + "'" + ";");
+            System.out.println("update sys_res set app_unique = "+ "'" + list2.get(i) + "'" +
+                    " where res_name = " + "'" + list1.get(i) + "'" + ";");
         }
 
     }
