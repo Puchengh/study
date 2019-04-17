@@ -25,7 +25,7 @@ if [ -z "$name" -a ! -z "$num" -a ! -z "$pass" ]
             then
                 for(( i=1;i<=$num;i=i+1 ))
                     do
-                        /usr/sbin/useradd $name$i &> /dev/null
+                        /usr/sbin/useradd $name$i &>/dev/null
                             echo $pass|/usr/bin/passwd --stdin $name$i &>/dev/null
                      done
         fi
