@@ -1,0 +1,30 @@
+<?xml version="1.0" encoding="Big5" ?>
+<!-- 在maven的setting文件services中配置私服的地址 -->
+<server>
+    <!-- ?行版的?? -->
+    <id>nexus-releases</id>
+    <username>admin</username>
+    <password>shxy1234</password>
+</server>
+<service>
+    <!-- 快照版的?? -->
+    <id>nexus-snapshots</id>
+    <username>admin</username>
+    <password>shxy1234</password>
+</service>
+
+
+<!-- 在pom文件中添加jar?依? -->
+<distributionManagement>
+<repository>
+    <id>nexus-releases</id>
+    <name>Nexus Release Repository</name>
+    <url>http://127.0.0.1:8081/repository/maven-releases/</url>
+</repository>
+<snapshotRepository>
+    <id>nexus-snapshots</id>
+    <name>Nexus Snapshot Repository</name>
+    <url>http://127.0.0.1:8081/repository/maven-snapshots/</url>
+</snapshotRepository>
+
+</distributionManagement>
