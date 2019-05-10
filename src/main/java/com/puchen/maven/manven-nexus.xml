@@ -8,9 +8,9 @@
 </server>
 <service>
     <!-- §Ö·Óª©ªº?? -->
+    <password>shxy1234</password>
     <id>nexus-snapshots</id>
     <username>admin</username>
-    <password>shxy1234</password>
 </service>
 
 
