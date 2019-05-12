@@ -1,0 +1,27 @@
+1 redis有序集合一样也是string类型元素的集合，且不允许重复的成员
+2 不同的是每个元素都会关联一个double类型的分数，redis正是通过分数来为集合中的成
+    员进行从小到大的排序
+3 有序集合的成员是唯一的  但分数确实可以重复的
+4 集合是通过哈希表实现的，所以添加 删除 查找的复杂度都是0（1） 集合最大的成员数是2^(32-1)
+
+redis的ZSet是有序 且不重复的
+赋值语法
+    zadd key score1 member1 [score2 member2]
+    有序集合添加一个或者多个成员，或者更新已存在成员的分数
+取值语法
+    zcard key 获取有序集合的成员数
+    zcount key min max 计算在有序集合中指定区间分数的成员数
+    zrank key member 返回有序集合中制定成员的索引
+    zrange key start stop [withscores]  通过索引区间返回有序集合成指定区间内的成员（低到高）
+    zrevange key start stop [withscores]  返回有序集合中指定区间内的成员，通过索引，分数从高到低
+删除语法
+    zrem key member [member...]  移除有序集合中的一个或者多个成员
+    zremrangebyrank key start stop 移除有序集合中给定的排名区间的所有成员（第一个是0）（低到高排序）
+    zremrangebyscore key min max 移除有序集合中给定的分数区间的所有成员
+
+应用场景
+    1 比如twitter的public timeline可以发表时间作为score来存储，这样获取时就是自动排序好的
+    2比如一个存储全班同学的sorted Set 其集合value可以是同学的学号，而score就可以使其考试得分，
+        这样在数据插入集合的时候，就已经进行了天然的排序
+    3还可以用sorted Set来做带权重的队列 比如普通消息为1 ，重要消息的score为为2，然后工作线程可以选择按score来
+        获取工作任务，让重要的任务优先执行
