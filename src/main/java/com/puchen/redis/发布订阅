@@ -1,0 +1,29 @@
+redis发布订阅是一种消息通信模式，发送者发送消息，订阅者接受消息
+redis客户端可以订阅任意数量的频道
+订阅频道
+subscribe channel [channel] 订阅给定的一个或者多个频道的信息
+psubscribe pattern [patttern...]  订阅一个或者多个符合给定模式的频道
+发布频道
+publish channel message  将信息发送给指定的频道
+退订频道
+unsubscribe [channel[channel...]]  指退订给定的频道
+punsubscribe [pattern[pattern...]]  退订所有给模式的频道
+
+应用场景
+    这一功能最明显的用法就是构建实时消息系统，比如普通的即时聊天，群聊等功能
+    1在一个博客园网站中，有100个粉丝订阅了你，当你发布新文章，就可以推送给粉丝们
+    2微信公众号模式
+
+Redis多数据库
+Redis下，数据库是由一个整数索引标识，而不是由一个数据库名称，默认情况下，一个客户端连接到数据库0
+redis配置文件中下面的参数来控制数据库总数：
+    database16 //（从0开始 1 2 3 ... 15）
+    select 数据库 //数据库的切换
+移动数据（将当前key移动另个库）
+move key 名称  数据库
+数据库清空：
+flushdb -->清除当前数据库的所有key
+flushall -->清除整个redis的数据库所有key
+
+缓存预热：当你系统第一次上线的时候，可以先把用户信息在redis中走一遍，以后用户登录就不需要在
+        走到mysql中去查询数据了，加速系统运行

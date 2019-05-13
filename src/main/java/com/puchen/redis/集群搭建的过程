@@ -1,0 +1,51 @@
+./7001/src/redis-server ./7001/redis.conf
+./7002/src/redis-server ./7002/redis.conf
+./7003/src/redis-server ./7003/redis.conf
+./7004/src/redis-server ./7004/redis.conf
+./7005/src/redis-server ./7005/redis.conf
+./7006/src/redis-server ./7006/redis.conf
+
+yum -y install ruby ruby-devel rubygems rpm-build
+
+安装rvm
+gpg --keyserver hkp://keys.gnupg.net --recv-keys 409B6B1796C275462A1703113804BB82D39DC0E3 7D2BAF1CF37B13E2069D6956105BD0E739499BDB
+\curl -sSL https://get.rvm.io | bash -s stable
+
+find / -name rvm -print
+source /usr/local/rvm/scripts/rvm
+rvm list known
+
+//修改 RVM 下载 Ruby 的源，到 Ruby China 的镜像:  ---可以不用
+echo "ruby_url=https://cache.ruby-china.com/pub/ruby" > ~/.rvm/user/db
+
+rvm install 2.5.3
+
+rvm use 2.5.3
+
+rvm use 2.5.3--default
+
+ruby --version
+
+gem install redis
+
+cd  /usr/local/bin/
+
+redis-trib.rb create --replicas 1 127.0.0.1:7001 127.0.0.1:7002 127.0.0.1:7003 127.0.0.1:7004 127.0.0.1:7005 127.0.0.1:7006
+
+
+测试
+ redis-cli -h 127.0.0.1 -c -p 7001         -c表明是集群
+
+ 当前节点信息  info replication
+ 查看所有节点的信息  cluster nodes
+
+ d6966c125c8c09c3e2749773074dc9513a2e2219 127.0.0.1:7005@17005 slave 1da0fdd25dff6d7ba75b3c3690abe19940cd4cb8 0 1557766388770 5 connected
+ b242dc560a1ad1a20ca0be25ea3f62f7d851e6cc 127.0.0.1:7006@17006 slave 0aaf2b05fcf43e8e32b3b78b061babb2ab56c793 0 1557766389778 6 connected
+ ce70343e9cc5dee6a3f5752748bc2b7b65bedd95 127.0.0.1:7004@17004 slave b65f32121263877a75137c6cb260d8c86427d9a1 0 1557766390788 4 connected
+ 0aaf2b05fcf43e8e32b3b78b061babb2ab56c793 127.0.0.1:7001@17001 myself,master - 0 1557766389000 1 connected 0-5460
+ 1da0fdd25dff6d7ba75b3c3690abe19940cd4cb8 127.0.0.1:7003@17003 master - 0 1557766388000 3 connected 10923-16383
+ b65f32121263877a75137c6cb260d8c86427d9a1 127.0.0.1:7002@17002 master - 0 1557766391796 2 connected 5461-10922
+
+每个Redis的节点都有一个ID值，此ID将被此特定redis实例永久使用，以便实例在集群上下文中具有唯一
+的名称。每个节点优惠记住使用此ID的每个其他节点，而不是通过ID或者端口。IP地址和端口可能会发生变化，
+单唯一的节点标识符在节点的整个生命周期内都不会改变。我们简单的称这个标识符为节点.
