@@ -1,0 +1,29 @@
+set元素唯一  数据无序   底层hashTable和inset两种数据结构存储的，
+            inset可以理解为数据，hashTable就是普通的哈希表（key为set的值，value为null）
+    inset内部其实就是一个数组，而且存储数据的时候是有序的。因为在查找数据的时候是通过二分查找来实现的
+赋值语法：
+    sadd key memeber1 memeber2  向集合添加一个或者多个成员
+取值语法：
+    scard key 获取集合的成员数
+    smembers key  返回集合中的所有成员
+    sismember key member 判断member元素是否是集合key的成员（开发中：验证是否存在判断）
+    srandmember key[count]  返回集合中一个或者多个随机数
+删除语法
+    serm key member1[member2]  移除集合中一个成员或者多个成员
+    spop key[count] 移除并返回集合中的一个随机元素
+    smove source destinatioin member 将member元素从source集合移动到destination集合
+差集语法：
+    sdiff key1 [key2]  返回给定所有集合的差集（左侧）
+    sdiffstore destination key1 [key2]  返回给定所有集合的差集并存储在destination中
+交集语法：
+    sinter key1 [key2] 返回给定所有集合的交集（共有数据）
+    sinterstore destination key1 [key2] 返回给定所有集合的交集并存储在destination
+并级语法：
+    sunion key1 [key2] 返回所有给定集合的并集
+    sunionstore destination key1 [key2] 所有给定集合的并集存储在destination集合中
+
+应用场景
+    常应用用于：对两个集合间的数据[计算]进行交集，并集，差集运算
+    1、以非常方便的事项加共同关注，共同喜好，二度好友等功能。对上面的所有集合操作，你还可以使用不同的
+        命令选择将结果返回给客户端还是存集到一个新的集合中
+    2、利用唯一性，可以统计访问网站的所有独立IP

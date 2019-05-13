@@ -1,0 +1,56 @@
+Redis
+安装redis
+1先解压文件
+2（必须进入解压文件的目录之下）make  编译文件
+3make PREFIX=/usr/local/redis install  安装  指定安装文件目录
+3 cp redis.conf  /usr/local/redis   拷贝redis文件到安装目录之下
+4修改文件信息
+daemonize no  --> yes  以守护进程的方式运行
+bind 127.0.1  注释掉  不然只限制本机登录
+requirepass   设置密码
+
+启动  service启动方式
+服务端启动   ./bin/redis-server ./redis.conf  带上配置文件  则说明配置文件生效  负责表明使用默认配置文件
+客户端启动  ./bin/redis-cli -h 192.168.232.130 -p 6379 -a redis  带上主机名 端口号 密码  不加则表明使用默认
+
+正常关闭redis ./bin/redis-cli shutdown          非正常关闭 kill -9 PID
+
+命令
+String类型
+del [key]  删除key
+dump [key] 序列化给定key
+exists [key]  判断是否存在
+expire [key] seconds 为给定的key设置过期时间（秒）
+pexpire [key] miallseconds  设置过期时间（毫秒）
+ttl [key]   -1 永久存在  -2 无效  key会消失  返回过期时间
+pttl [key]   返回过期时间 以毫秒的方式给定
+persist [key]  永久保存d
+getrange [key] 0 2  字符串的截取
+getset [key] value 先取值后赋值
+strlen [key] 返回字符串的长度
+默认自增1  否则自增数量加后面
+incr [key]   自增
+decr [key] 自减
+append [key] value  为指定的key最佳值末尾  如果不存在  为其赋值
+hash类型
+一个hash可以存储2^32-1键值对（40多亿）  适合存储对象
+hmset [h] key value key value key value ...   存储对象
+hmget [h] key key ...  取出对应对象可以对应的值
+hgetall [h]       取出对应对象的所有值
+hkeys [h]  获取对象的key
+hlen [h]   获取对象的键值对的个数
+hdel [h] key   删除对象的属性key值对
+hincrby [h] key increment  为对象的
+hexists [h] key 是否存在
+应用场景 适合存储一个对象  是最接近关系数据库结构的数据类型，可以将数据
+查询和修改的时候会引起很不必要的麻烦和时间的浪费
+在redis中如果value中没有值得话redis中自动回收key
+
+Java连接Redis
+常见的Java客户端访问有  Jedis/Redisson/Jredis/JDBC-Redis
+
+
+
+
+
+
