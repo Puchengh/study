@@ -1,0 +1,114 @@
+Spring Boot + Spring Cloud 组件多 功能完备  Spring Boot 开箱即用
+Spring Boot + Dubbo + Zookeeper 组件少 功能完备 Alibaba Dubbo -> Appache Dubbo 孵化项目
+RPC 通信框架 -> 微服务架构解决方案
+
+微服务机构遇到什么问题？分布式系统开发
+
+四大问题  高可用 -> 一直可以用，高并发，高性能
+
+最大的问题 ——> 网络是不可靠的
+
+1.客户端如何访问这么多的服务
+    API网关
+2.服务与服务之间如何通信
+    同步通信
+        HTTP（Apache HTTP Client）
+        RPC(Dubbo  只支持java，Apache Thrift 纯粹的RPC框架 ，gPRC)
+    异步通信
+        消息队列 Kafka RabbitMQ RocketMQ
+3.这么多服务如何管理
+    服务治理
+        服务注册于发现
+            基于客户端的服务注册与发现
+                Apache Zookeeper
+            基于服务端的服务注册与发现
+                Netflix Eureka
+4.服务挂了怎么办
+    重试机制
+    服务熔断
+    服务降级
+    服务限流
+
+Zookeeper  分布式协调服务
+分布式协调技术主要用来解决分布式环境中多个进程之间的同步控制，让他们有序的去访问某种临街的资源，防止造成脏数据的后果.
+协调的本质就是分布式锁，  Zookeeper是实现分布式锁的实现框架.
+分布式锁应该具备哪些条件
+    在分布式系统环境下，一个方法在同一个时间只能被一个机器的一个线程执行
+    高可用的获取锁与释放锁
+    高性能的获取锁与释放锁
+    具备可重入特性（重新进入，有多于一个任务并发使用，而不必担心数据错误）
+    具备锁实现机制，防止死锁
+    具备非阻塞锁特性，既没有获取到锁将直接返回获取锁失败
+分布式锁的实现有哪些？
+    Memcached：利用 Memcached 的 add 命令。此命令是原子性操作，只有在 key 不存在的情况下，才能 add 成功，也就意味着线程得到了锁。
+    Redis：和 Memcached 的方式类似，利用 Redis 的 setnx 命令。此命令同样是原子性操作，只有在 key 不存在的情况下，才能 set 成功。
+    Zookeeper：利用 Zookeeper 的顺序临时节点，来实现分布式锁和等待队列。Zookeeper 设计的初衷，就是为了实现分布式锁服务的。
+    Chubby：Google 公司实现的粗粒度分布式锁服务，底层利用了 Paxos 一致性算法。
+redis实现分布式锁的核心：
+    三大核心要素
+        加锁  setnx
+        解锁  del(key)
+        锁超时 exprie(key,30)
+
+    单体应用 JVM 一个进程里有多个线程  同步代码块 有序的访问资源
+    三大致命问题
+        1.非原子问题 setnx expire    set(key,value,expire)
+        2.误删锁  解决方案  判断是不是自己的锁  带着商品ID和线程ID判断是不是当前查询的锁，是则删除锁
+        3.基于第二个问题之上 判断是否处理完成 当前jvm 处理完成后才能释放锁
+            jvm增加一个守护线程  续命20秒 等待完成  处理完成数据后  守护线程自动下线
+
+Zookeeper      服务的注册与发现  是通过Znode，watch机制来通信的
+    Zookeeper是一种分布式协调服务，用于管理大型主机。在分布式环境中协调和管理服务是一个复杂的过程。Zookeeper通过其简单的架构和API
+    解决了这个问题。Zookeepe允许开发人员专注于核心应用程序逻辑，而不必担心应用程序的分布式特性。
+    写操作 --> 事务
+    watcher 观察者模式
+
+    zookeeper 客户端 jvm1 有一个依赖 zkClient,jar  ---getData(/动物/猫，true)  异步通知zkClient---> Zookeeper 服务端的数据  WatchTable  存放要监控的数据
+
+    异地多活数据中心
+
+    Zookeeper
+    一个节点leader写入
+    四个节点follower去读数据
+
+    ZXID 相当于一个编号 -> 自增  事务ID 1 2 3 4 5
+    ZAB的奔溃回恢复的重要参数
+
+    主节点挂了 无法访问  进入崩溃恢复阶段 所有从节点发起投票 zh ID  -->选举出准主节点状态
+
+    同步节点  吧leader刚才手机得到的最新历史事务日志，把同步集群中所有的Follower，只有半数Follower同步成功，这个准Leaser才能称为正式的Leaser
+
+    ZAB的数据写入
+    ZAB 的数据写入涉及到 Broadcast 阶段，简单来说，就是 Zookeeper 常规情况下更新数据的时候，由 Leader 广播到所有的 Follower。其过程如下：
+
+    客户端发出写入数据请求给任意 Follower。
+    Follower 把写入数据请求转发给 Leader。
+    Leader 采用二阶段提交方式，先发送 Propose 广播给 Follower。   先准备数据（提交日志） 再提交数据  insert-->commit
+    Follower 接到 Propose 消息，写入日志成功后，返回 ACK 消息给 Leader。
+    Leader 接到半数以上ACK消息，返回成功给客户端，并且广播 Commit 请求给 Follower
+
+数据一致性
+    强一致性
+    弱一致性
+    顺序一致性
+
+比较
+    分布式锁          优点                                        缺点
+    Zookeeper   1有封装好的框架，容易实现                      添加和删除节点性能较低
+                2有等待锁的队列，大大提升强锁
+                的效率
+    Redis       Set和Del指令的性能较高                       1 实现复杂 需要考虑超时 原子性 误删除等情形
+                                                          2  没有等待锁的队列，只能在客户端自己来等锁，效率低下
+# 分布式锁
+    这是雅虎研究员设计 Zookeeper 的初衷。利用 Zookeeper 的临时顺序节点，可以轻松实现分布式锁。
+
+# 服务注册和发现
+    利用 Znode 和 Watcher，可以实现分布式服务的注册和发现。最著名的应用就是阿里的分布式 RPC 框架 Dubbo。
+
+# 共享配置和状态信息
+    Redis 的分布式解决方案 Codis，就利用了 Zookeeper 来存放数据路由表和 codis-proxy 节点的元信息。同时 codis-config 发起的命令都会通过 ZooKeeper 同步到各个存活的 codis-proxy。
+
+    此外，Kafka、HBase、Hadoop，也都依靠Zookeeper同步节点信息，实现高可用。
+
+
+
