@@ -1,0 +1,124 @@
+在Map和Reduce的过程中会有一个shuffle的过程
+
+排序  排序之后相同的单词就在一起了  所有排序在前  WritableComparable
+
+分组  WritableComparator  分组就是一个比较的过程  按照key比较  只要返回0的就会认为是一组   如果不返回0 就划到下一组
+
+分区  将结果输出进行分类  Partition  默认实现是HashPartitioner
+
+组件   Combiner组件  ：合并组件   小结果统计
+
+自定义类：mapreduce中如果想要自定义类作为传输的key或者value  那么自定义类必须实现序列化和反序列化
+	实现Writable接口
+
+Combiner组件
+	map的并行度和切片相关  和数据有关  数据越大maptask的并行度越高
+	所有计算任务全部在reduce上
+	如果map可以和reduce分担一部门压力 reduce的性能肯定会提高
+	作用:减少reduce端的数据量  在map端做了一次合并  减少了shuffle过程的数据量  提高分布式计算程序的整体性能
+	Combiner组件可以分担reduce压力  combiner中的业务逻辑和reduce中的业务逻辑一样
+	
+	自定义Combiner组件   默认情况下  没有Combiner组件的
+	  1）继承reduce类  
+	  	在写maopreduce程序的时候  map的输出就是reduce的输入
+	  	也就是说这个reducer的前两个泛型和后两个泛型的类型一致
+	  2）重写reduce方法
+	  	通常情况下Combiner可以直接使用reduce方法
+	Combiner本质上相当于在map端进行了一次reduce程序
+	不可以对多个maptask的结果进行合并
+  注意：
+ 	有时候能用Combiner  有时候不能使用Combiner   根据业务逻辑综合使用 		
+ 	
+排序 
+	mapTask--->reduceTask之间框架默认加了排序
+	排序的规则是按照map端输出的key的字典顺序进行排序
+	如果想要对词频进行排序  那么词频应该放在map输入的位置  并且自定义的类必须放在key的位置
+	
+	排序的时候精良避免在reduce端进行排序    如果要在reduce端进行排序
+	
+全局计数器
+	程序运行过程中框架自带的计数器
+		文件系统计数器  File System Counters  文件读写的计数器
+		mapreduce框架计数器   Map-reduce Framework 
+	自定义的计数器 ：
+		应用场景：去全局变量的时候会使用
+		Counter
+		先定义一个枚举类
+
+maptask端shuffle过程:
+	环形缓冲区
+		是maptask输出结果会先输出到环形缓冲区中
+			context.write()  //调用一次写出一个
+				maptask的输出结果会频繁的写出  不是直接写到硬盘  这个结果首先会写到一个内存缓冲区中
+				环形缓冲区：默认大小100M   mapreduce.task.io.sort.mb  100MB
+					阈值：0.8  当达到阈值之后 环形缓冲区会出发写入磁盘的操作  批量操作  达到80MB的时候会写入磁盘     会开启溢写线程 向磁盘溢写  先进行排序  溢写文件spill
+					在溢写之前会对环形缓冲区的数据进行排序，先根据分区排序，会造成相同的分区排在一起,在对key进行排序，会造成相同的key在一起  这里采用的排序是快速排序
+					最后的数据不够达到溢写阈值  会强制flush 刷出
+					溢写出的文件在归并排序   多个文件进行归并  sort
+					一个maptask对应一个输出文件
+		maptask端的时候，先按照分区排序，在按照key值去排序
+		操作元数据，原始数据不动，
+					
+					写入之后会自动清空  底层存储的是一个字节数组     收尾相连写入的  
+					写入的时候类似环形的操作   所以叫做环形缓冲区
+	equtor这个边界  又叫赤道  用于区分元数据和原始数据    赤道上面写的是原始数据  下面写的是元数据 
+		原始数据:maptask输出的数据 hello,1  
+		元数据:用于记录原始数据的数据    shuffle过程中会进行排序  原始数据按照key进行排序
+		在写入到元数据的过程中会调用分区组件，如果没有定义则调用默认的，如果定义了，调用自定义的分区0,1,2,3,会将这个信息记录到元数据中顺序写的
+				元数据包含了四部分内容：1原始数据key的其实位置
+								2原始数据中value的起始位置
+								3value的长度
+								4记录了分区信息   这条数据属于哪个分区
+								16字节*4=64个字节
+								
+								每一条元数据调用的空间大小是一样的，
+								在进行排序交换文职的时候可以交换元数据
+								
+								在环形缓冲区中的20是以便于继续进行数据写入   缓存清空调整成背对背的模式
+								
+								如果写出到磁盘过程中剩下的20M写满了就会进入阻塞状态   阻塞到80M的空间释放
+combiner在环形缓冲区溢写的过程中  归并排序中也会出现combiner
+
+在数据量大的时候  可以对maoTask结果启用压缩，将mapreduce.map.ouput.compress设为true，
+并使用maoreduce.map.output.compress.codec设置使用的压缩算法,可以提高数据创术reducer端的效率.
+
+
+
+	reduceTask一定要在maptask执行完成之后执行					
+reduce端的shuffle过程：
+	1.(底层默认的)开启5个线程进行数据抓取,dao maptask运行节点进行抓取,按照分区进行抓取  fetch  reducetask主动开启的线程
+	2.
+shuffle过程：全流程的
+	为了保证对应的分区的数据进入到对应的reducetask中  将map端输出的结果相同的分区排在一起，
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+		
+
+		
+		
+		
+		
+
+		
+		
+		
+		
+		
+		
+		
+		
+		
+		

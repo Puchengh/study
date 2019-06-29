@@ -1,0 +1,29 @@
+输入：
+	默认的文件加载  TextInputFormat
+	默认的文件读取  LineRecordReader
+	context--->mappercontext---->mapcontext--->reader---->input---->real---->inputFormat
+	
+	getClass(属性,默认值)    默认创建的对象TextInputFormat      TextInputFormat是inputFormat的实例对象
+	RecordReader抽象类返回了一个实现类RecordReader
+	--->默认的文件读取  LineRecordReader
+		有context的三个实现方法  
+		在package org.apache.hadoop.mapreduce.lib.input中有一个实现类  LineRecordReader
+		
+		getCurrentKey() 
+		getCurrentValue()   
+		boolean nextKeyValue()  判断是否还有下一行内容需要读取  返回值是boolean类型  
+		最后把key和value设置为NULL，提醒GC进行垃圾回收	
+		
+		获取到到的东西传递给自定义的Mapper<context.getCurrentKey(),context.getCurrentKey(),自定义>()方法
+		
+		自定义输入:重写这两个类的子类
+			FileInputFormat
+			RecordReader   子类
+		多个小文件合并的:
+			word.txt-------word10.txt
+			默认情况下读取的时候是一行一行读取的
+			一次性读取一个小文件  每次读取的整个小文件的内容
+输出
+	默认的文件加载  TextOutputFormat
+	默认的文件读取  LineRecordWriter
+		

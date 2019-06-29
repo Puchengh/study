@@ -1,0 +1,38 @@
+reduceTask任务	
+
+reduce端进行任务分配的时候的每一个小任务
+reduce端的任务进行划分     通过我们分享最终的reducetask的并行度和分区个数有关系.
+reudcetask的并行度在显示上就是最终输出结果的个数   输出结果1个就是启动一个reducetask
+任务的并行度怎么设置:
+	job.setNumReduceTasks(3);设置的reducetask的个数 参数传入的代表最终启动的renducetask的数量
+	最终输出结果是3个文件  part-r-00000  part-r-00001  part-r-00002
+	生成的3个文件各自统计的不同的key的结果    最终3个文件合并在一起就是最终的统计结果
+内部是maoreduce的默认分区方式的不同的猫输出的key进入到不同reducetask中
+	Partitioner()抽象类--HashPartitioner  默认的实现类
+	默认的分区方法getPatition
+	return (key.hashCode & Integer.MAX_VALUE) % numReduceTask;
+	最终通过这个函数不同的余数进入到不同的reduceTask进行计算
+	这样就可以保证相同的keu进入了相同的reducetask中
+	reduce并行度-----job.setNumReduceTasks(3)---设置了几个就有几个reducetask--最终对应输出文件的个数
+	
+	自定义分区算法  默认的不能满足需求，则我们可以自定义分区
+		需求：进行单词统计的a-j中的放到第一个文件中 k-z放到另外一个文件中
+最终决定reduceTask的个数就一句
+	job.serNumReduceTask(3);
+	自定义分区的时候：
+		假设分区个数3个，最终输出结果肯定是按照设置的job.serNumReduceTask(3)获得到文件的
+		自定义分区的时候  如果自己设置的reduceTask>分区类中数量怎可以  或者serNumReduceTask(1)默认的则不会报错
+	自定义分区的返回值代表的含义：
+		是和reduceTask的id对应  正常情况下的reduceTask从0开始编号
+		如果分区中返回0代表对应的reduceTask0最终对应的结果文件中的part-r-00000
+		如果分区中返回0代表对应的reduceTask1最终对应的结果文件中的part-r-00001
+		如果分区中返回0代表对应的reduceTask2最终对应的结果文件中的part-r-00002
+	reduceTask不设置的情况下默认是1
+	reduceTask的并行度最终会影响到程序的总体执行效率，reduceTask在进行任务分配的时候一定要特别小心
+	设计分区的时候一定要足够了解数据，如果设计不好容易产生数据倾斜
+	数据倾斜:每个reduceTask处理的数据不均匀
+	数据倾斜造成的直接后果：影响代码的整体执行效率      10个reduceTask任务9个完成了  只有1个始终完成不了 会拉低效率
+	合理设置分区可以避免数据倾斜
+	
+		
+	

@@ -1,0 +1,51 @@
+在提交代码的时候：
+	进程：MRAppmaster:整个运行程序的管理者  管理的是整个程序的运行进度
+		yarnChild:masktask和reducetask运行的进程  1个yarnChild对应1一个maptask
+				  或者reducetask任务
+mapTask任务并行度：  并行度 ：就是分布式运行了多少个
+maptask就是分而治之中的分了多少个小任务  类似map函数的调用次数
+最终程序运行多少个maptask   HDFS数据存储的时候按块进行存储的，最终maptask的任务划分应该和底层的块有直接的关系
+任务划分就是对原始处理数据进行任务切分  让不同的数据跑在不同的计算机节点上
+
+在FileInputFormat有一个方法getSplits（）  这个方法 就是决定每个mapTask的任务划分的
+split:切片  逻辑切片  只是进行一个逻辑划分并没有真正的进行数据切分
+数据：0-300M     mapTask01:0-100M
+			  mapTask01:100-200M
+			  mapTask01:200-300M
+			  
+这个方法就是获取每一逻辑切片的  这里说的每一个maptask任务 最终对应到数据上就是对应的一个split切片
+一个split对应1个maptask任务对应1个yanrchild进程
+这个逻辑切片的大小
+	底层存储--128M   不同的数据块可能存储在不同的数据节点上
+	切片大小1G:计算任务进行取数据的时候将会在多个节点上取数据
+	切片大小100M:不合适  会造成第一个计算任务取得是第一个块0-100M之间的数据  会造成跨数据块读取数据   产生网络传输
+	理论上切片的大小为128M合适
+	
+	默认情况下切片大小就是数据块的大小
+	那么我们一个mapTask任务最终处理的数据就是一个切片的数据               一个切片对应一个mapTask-->1ge yarnchild
+	最终启动多少个maptask任务和切片个数有关（默认情况下等于块的个数）
+	切片和快的关系
+		没有实际的关系  一个是数据计算逻辑的划分  一个数据存储的物理划分
+		默认情况下切片和快大小一致
+	和副本没有关系  副本的作用只是保证数据安全  保证计算的时候有数据可以拿到就行 实际使用只需要一份就够了
+	
+	想要改并行度  就需要修改切片大小
+	1）修改配置文件   mapreduce.input.fileputformat.split.maxsize
+			  mapreduce.input.fileputformat.split.minsize 添加到mapred-site.xml
+	2)修改代码
+//		//设置切片的消息   单位是字节Byte
+修改最大值的带的切片的大小>块大小
+修改最小值的带的切片的大小<块大小
+//		FileInputFormat.setMinInputSplitSize(job, 640);
+//		FileInputFormat.setMaxInputSplitSize(job, 200*1024*1024);
+		
+	生产中出现大量小文件启动分片设置
+	TextFileInputFormat不会合并小文件
+	CombineFileInputFormat会合并小文件
+	
+//	job.setInputFormatClass(CombineTextInputFormat.class);
+//	CombineTextInputFormat.setMaxInputSplitSize(job, 10*1024*1024);
+//	CombineTextInputFormat.addInputPath(job, new Path(args[0]));
+
+
+			  

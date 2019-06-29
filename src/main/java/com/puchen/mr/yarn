@@ -1,0 +1,46 @@
+yarn:
+	负责集群的资源调度
+	hadoop1.0中只有两个hdfs 负责存储  mapreduce 负责计算
+	所有计算相关的全部放到mapreduce上
+		jobTracker  整个计算程序的master   资源调度,随机调度,监控程序运行的状态,启动运行程序
+			jotracker  存在单点故障问题
+	 	tasKTracker  负责计算程序的执行  强行将计算资源分成两部分
+	 				1mapslot
+	 				2reduceslot
+	 		每一部分资源只能跑对应的任务  没划分资源 网络 CPU
+	缺陷:
+		1）单点故障问题
+		2）资源调度是随机的  会造成资源浪费
+		3）容易造成jobtracker的运行压力过大
+	在hadoop2.0：mapreduce-----mapreduce和yarn：专门负责程序的资源调度
+
+	概念：主从结构
+		启动的进程是
+		resourceManager  整个资源调度的master
+			1.负责客户端的请求  这个请求是运行程序的请求
+			2.接受nodemanager的状态报告  包括nodemanager的资源状态还有存活状态
+			3.负责整个计算程序的资源调度      调度的运行资源和节点
+		nodeManager  负责真正的提供资源 运行计算程序
+			1.接受resourcemanager的命令
+			2.提供资源运行计算程序
+
+		启动计算机以及资源调度的概念
+			MRAppMaster：单个计算程序的leader  负责帮助当前计算程序向resourceManager申请资源、
+				负责启动maotask和reducetask任务  负责监控maptask和reduceTask的运行进度（类似项目经理）
+				wordCount---mrappmaster
+			ASM：applicationsmanager  所有应用程序的管理者   负责调度应用程序
+			Container:抽象资源容器  封装着一定的CPU IO 和网络资源  虚拟的资源容器
+				是运行maptask reducetask等的运行资源单位
+				1个split文件---1个maptask---1个container中启动---yarnchild    底层运行的资源单位就是container
+			Scheduler:调度  调度的是什么时候执行哪个计算程序
+				默认的调度器有三种  内部内置的调度器
+					FIFO 先进先出  先提交的先执行  后提交的程序后执行    内部维护一个队列
+					FAIR 公平调度器   大家平分资源运行
+					CAPICITY  计算能力调度器   可以按照需要进行配置使用资源    内部可以维护多个队列，对个队列之间可以进行资源分配
+						两个队列可以分配资源  60%资源    40%资源  但是在每个队列中都是执行FIFO
+
+				application对应的就是mr程序中的job
+		运行程序的时候1.0是没有这些的
+		runjar   运行的java jar包的进程
+		MAAppMaster
+		YranChild
