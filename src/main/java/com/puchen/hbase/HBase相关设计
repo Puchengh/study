@@ -1,0 +1,43 @@
+******************************************************************************************
+HBase的相关设计：
+    列簇的设计：会把具有相同IO特性的列  划到一个列簇中   经验  不要超过3个  最好1个
+                列簇单独存储一个物理文件   一起查询某些列的时候会造成磁盘IO和网络IO消耗  列簇不宜过多
+    rowKey的设计:
+        1.rowkey必须是唯一的
+        2.rowkey的一定不要太长  10-100byte   最好是16byte
+            每一个列簇都会存储rowkey  如果太长  会存储大量的浪费空间
+            在写入数据的时候  先写在memestore  如果太长 会占用大量的内存空间
+        3.散列的原则  避免数据热点问题  相同并发的rowkey尽量分散
+            数据热点：某一个region的并发访问  远远大于其他的region 这个region 数据热点
+            尽量避免的 因为数据热点会造成当前的region的压力过大
+            还会造成 资源的不合理
+
+            造成的原因:
+                频繁访问的数据被分配到同一个region上  某几个region上了
+                rowkey设计的问题
+            habse表----某运营商流量
+            rowKey--电话号码
+            字典顺序排序      13    15   18rowkey的中值
+
+            解决方法:
+                1)hash散列  对电话号码取值hash
+                2）加盐    http://www.baidu.com?salt=随机生成的字符串
+                    在原来的rowkey的基础上加一个随机字符串
+                    asdfasdfasdf+rowkey
+                3）反转  将原来的rowkey进行反转  时间最为rowkey的时候  或者电话号码也可以
+
+    目前操作系统都是64位系统 内存8字节对齐   控制在16个字节  8个字节的整数倍利用操作系统的最佳特性
+
+
+hive和habse的整合
+原理
+    hive和habse利用两者本身对外的API来实现整合  主要靠的是habsestorageHandler进行通信
+    利用hBaseStorageHandler,hive可以获取到hive表对应的hbase表名，列簇以及列，
+    inputformat和outputformat类  创建和删除habse表等
+    hive访问hbase中标数据 实质上是通过mapreduce读取表数据，其实现是在MR中 使用hiveHbasetableinputformat
+    完成hbase表的切分  获取recordReader对象来读取数据
+    ############################################################################
+    对hbase表的切分原则是一个region切分成一个split，即表中有多少个regions MR中就有多少个map
+    ############################################################################
+    读取Hbase表数据都是通过构建scanner，对表进行全表扫描。如果过滤条件，则转化为Filter。
+    当过滤条件为rowkey时，则妆花为对rowkey的过滤，scanner通过RPC调用regionServer的next（）来获取数据

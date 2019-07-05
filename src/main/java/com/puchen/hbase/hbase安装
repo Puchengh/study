@@ -1,0 +1,82 @@
+GFS----HDFS分布式文件系统  离线存储
+MAPREDUCE-------分布式并行计算  离线并行计算    离线--延迟性高   并行--多个节点并行计算
+         移动计算比移动数更划算  数据在哪里计算就去哪里
+离线问题:
+    100T文件  url  快速查询某一个URL是否在文件中
+    mapreduce可以查询出来-----高延迟的数据
+bigTable-----hbase   存储和数据访问    实时查询---近实时
+    布隆过滤器---位数组存储  也是有上线的
+    1）实时：----要求在ms之内  毫秒
+    2）近实时：----要求在s之后  秒
+Hbase 底层是布隆过滤器存储
+跳表结构：建立索引  多级索引  一级一级建索引
+HBase：布隆过滤器+调表   每个索引范围的数据存储在不同的节点上
+原始数据放在HDFS
+    索引存储应该放在HDFS
+    顶级的索引存储在HDFS   各个节点都可以访问到
+    肯定需要一个能够记录顶级索引存储地点的 这个叫做索引入口 关键---存储必然需要多份   zookeeper存储索引入口  --数据同步问题
+HBase要依赖于Zookeeper
+HBase的原始数据存储在HDFS上
+HBase是用java语言写的
+
+    考虑兼容性的问题
+        JDK
+        H
+HBase的架构：
+    主从架构   一主多存的架构  （HMaster，HRegionServer）
+    规划    3个节点
+    修改配置文件
+        1)hbase-env.sh
+        设置java路径
+        # Tell HBase whether it should manage it's own instance of ZooKeeper or not.
+        export HBASE_MANAGES_ZK=false
+        true:代表使用hbase自带的zookeeper  这个方案只适合单机模式  不适合分布式模式
+        false：不适用hbase自带的 使用自己安装的zookeeper
+        2）hbase-site.xml  核心配置文件
+        <configuration>
+          <!-- 设置HRegionServers共享目录，请加上端口号 -->
+          <property>
+            <name>hbase.rootdir</name>
+            <value>hdfs://ns1/hbase</value>
+          </property>
+          <!-- 启用分布式模式 -->
+          <property>
+            <name>hbase.cluster.distributed</name>
+            <value>true</value>
+          </property>
+
+          <!-- 指定Zookeeper集群位置 -->
+          <property>
+            <name>hbase.zookeeper.quorum</name>
+            <value>hadoop01:2181,hadoop02:2181,hadoop03:2181</value>
+          </property>
+
+          <!-- 指定独立Zookeeper安装路径 -->
+          <property>
+            <name>hbase.zookeeper.property.dataDir</name>
+            <value>/usr/local/environment/zookeeper-3.4.14</value>
+          </property>
+
+          <!-- 指定ZooKeeper集群端口 -->
+          <property>
+            <name>hbase.zookeeper.property.clientPort</name>
+            <value>2181</value>
+          </property>
+        </configuration>
+
+        3）regionservers
+        配从节点的信息
+        4）添加一个文件backup-masters
+        备份hmaster的备份节点
+        5）core-site.xml  hdfs-site.xml文件copy到conf下面
+
+HBase启动顺序
+1---启动hbase
+start-hbase.sh
+2---单独启动另外一个节点
+hbase-daemon.sh start master
+
+关闭hbase
+stop-hbase.sh
+
+在hbase中可以启动多个master的  只有一个是active的  剩下的全部是backup的

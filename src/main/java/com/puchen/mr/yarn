@@ -4,7 +4,7 @@ yarn:
 	所有计算相关的全部放到mapreduce上
 		jobTracker  整个计算程序的master   资源调度,随机调度,监控程序运行的状态,启动运行程序
 			jotracker  存在单点故障问题
-	 	tasKTracker  负责计算程序的执行  强行将计算资源分成两部分
+	 	tastTracker  负责计算程序的执行  强行将计算资源分成两部分
 	 				1mapslot
 	 				2reduceslot
 	 		每一部分资源只能跑对应的任务  没划分资源 网络 CPU

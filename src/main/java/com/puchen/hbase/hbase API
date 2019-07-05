@@ -1,0 +1,92 @@
+API  13个
+
+管理对象
+hbaseconfiguration  hbase的配置文件对象
+hbaseadmin/admin  ddl操作句柄   ddl语句的管理对象
+htable/table   dml的操作句柄   表数据的管理对象
+htabledescriptor   描述对象  列簇的描述对象
+hclumndescriptor   列 列簇描述对象
+
+基本操作对象：
+put  put
+get   获取
+delete   删除
+scan   扫描
+
+原始数据---索引---二级索引   这个索引存在zookeeper中  寻址入口
+
+结果集管理对象：
+result   结果集对象
+resultScanner
+key-value  key-value
+cell   单元格对象
+
+非可靠的命令
+ha状态的手动切换  hdfs
+    hadf haadmin -transitionToAction --forceaction hadoop01(命名空间别名)
+    使用的时候注意 ：会使zkfc自动切换失效
+    使用上面的命令之后  请重启zkfc
+yarn的手动切换
+    yarn rmadmin -transitionToAction --forceaction rm1(命名空间别名)
+
+如果是虚拟机，怎强制windows重启
+**************************************************************************************************************
+
+过滤器:
+比较运算符：
+>  greater
+>= greater equal
+== equal
+< less
+<= less equal
+!= not equal
+
+比较规则：需要使用哪种方式进行比较
+BinaryComparator  安字节索引吮吸比较指定字节数组  采用Bytes.compareTo(byte[])   文本比较
+BinaryPrefixComparator 跟前面相同，只是比较左端的数据是否相同
+NullComparator  判断给定的是否为空
+BitComparator  按位比较
+RegexStringComparator 提供一个正则的比较器，仅支持equal和非equal
+SubstringComparator  判断提供的字串是否出现在value中
+
+指定过滤器的时候需要指定比较运算符  还需要指定比较规则  文本 ---字节比较  BinaryComparator
+
+过滤器是在表扫描的时候添加的 scan
+
+
+hbase
+hmaster
+hregoinserver---从节点上 存在多个regoin
+    regoin   高并发访问    会造成数据热点   读写频繁   其他region都空闲
+    regoin
+
+
+
+预分区：提前分区 分成多个region
+
+/**
+		 *参数解析   去头去尾 中间平分
+		 * 1.表描述器
+		 * 2.其实key  第一个分区的结束rowkey
+		 * 3.结束key  最后一个分区的其实reokey   中间的分区  平均分的
+		 * 4.分区数量
+		 * 预分区的目的是将表划分到多个regionserver上   达到避免数据插入或读取的时候 数据热点问题
+		 */
+//		admin.createTable(htd, "100".getBytes(), "600".getBytes(), 7);
+
+		/**
+		 * 这种方式 定义的是分界线  region之间的分界线  分区就是按照rowkey排序的
+		 *
+		 */
+		byte[][]  split = {"100".getBytes(),"300".getBytes(),"500".getBytes()};
+		admin.createTable(htd, split);
+
+预分区之后数据region分裂  然后导致region不平衡，
+
+maseter定期的检查各个regionserver上的region的个数  负载不均衡的时候
+master会主动做
+计算平均每台机器上：7+12+15/3=11.3333
+0.2（非严格下） 阈值   0.001严格的平衡
+上限：avg*(1+0.2)
+下线：avg*(1-0.2)
+会重新出发rebalancer

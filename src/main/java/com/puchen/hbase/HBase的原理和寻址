@@ -1,0 +1,113 @@
+hbase的存储：
+
+    同一个region中存储的肯定是同一个表中的数据
+region是按照行的方向上进行切分的   按照rowKey切分的
+    底层是hdfs上   是以region进行存储的  region可以理解成hdfs上数据的指针
+    region：是hbase上数据分配节点的基本单元  每一个region都会存储在一个regionserver上
+            一个regionServer会存储在多个region  但是一个region只能属于一个regionserver
+            每一个region都会有独立的ID
+    建表只有一个region  随着数据的增大 region会分裂   0.96之前是256M   以后是10G
+        10737418240K = 10G
+    随着数据量的增大  region的个体数肯定会越来越多  100T---100个G  数据查找 全表扫描
+    .meta表：就是原始数据region的索引
+        记录的信息：
+        1）存储的节点
+        2）region的ID
+        3）起始和结束的行键
+        一个region会在.meta表中对应一条数据
+        .meta表同样需要存储 .meta表也理解成hbase中的一个表 仍然以region为存储单位
+        当region个数足够多的时候 .meta表也可能很大  10G就开始进行分裂
+        用户进行检索的时候：先去检索.meta表 获取原始数据存在哪个region上
+        .meta表也被分裂成多个region上
+    —root表：.meta表的索引表  主要记录.meta表的region存储信息
+        1）存储的节点
+        2）region的ID
+        3）起始和结束的行键
+     查找数据: -root表 -----> .meta表  ----> 到某个节点上查找原始数据的目录  ---->到相应的region查找数据
+
+     -root表不在进行分裂了  无论多大都只是一个表  理解成普通的hbase上的表   也是存储在region上面
+
+    ##############################
+    -root表的region地址存储在zookeeper中
+
+    寻址
+    0.96之前 zookeeper就存了一个-root信息   0.96之后就变为了存储meta-region-server
+    客户端---zookeeper  获取-root的地址
+
+
+bytes.add(byte[],byte[]) 将传入的两个参数拼成一个字节数组 byte[]
+                         第一个参数作为字节数组的地位 第二个参数 高位
+
+bugtable使用三层类似B+树的结构来保存region位置
+.meta  是一个特殊的表 保存了habse中所有数据表的region位置信息
+为了加快访问 .meta表的全部region都保存在内存中
+
+需要6次我甘洛来回 才能定位到正确的region
+
+
+读写过程  插入数据  删除数据等等都是读写操作
+    先去找zookeeper--->root表---->.meta表--->原始数据正确的region信息
+    按照行键  在行的方向上 真正存储的时候是按照列键进行物理存储的
+    有几个列簇存储几个文件  在region中的文件称为store  store对应每一个storeFile
+    每个store对应一个缓存空间  基于内存的  memoryStore
+    溢写的文件称为storeFile   开启一个线程flush线程     WAL--write ahead log   HLog都是预写文件 ----->一个预写日志文件
+    预写文件在HDFS中会生成WAL文件和oldWAL文件    oldWAL文件是历史日志文件  能都随时清空的文件
+    越写日志的文件的作用：帮助数据恢复          memeoryStore默认是128M  阈值08
+
+    会生成很多个storeFile最终肯定存在HDFS里面 生成的文件写入到HDFS文件叫HFile文件
+
+    写文件
+       1client先根据rowkey找到对应的region所在的regionserver
+       2client向regionserver提交写的请求
+       3regionserver找到目标region
+       4region检查时候与schema一致
+       5如果客户端没有指定版本  则获取当时系统时间作为数据版本
+       6将更新写入WAL log
+       7将更新写入Memstore文件中
+       8判断Memstore的是否需要flush文件为storeFile文件
+    读文件
+        1客户端通过zookeeper以及-root和.meta表找到目标数据所在region（就是数据所在的region的主机地址）
+        2联系regionserver查询目标数据
+        3regionserver丁文到目标数据所在的region  发出查询请求
+        4region先在memestore中查找  命中则返回
+        5如果在memstore中找不到  则在storefile中扫描（可能会扫描到很多的storefile------BloomFilter）
+        ###BloomFilter  布隆过滤器：迅速判断一个元素是不是在一个庞大的集合中，但是他有一个锁典：有一定的误判率
+           误判率：原本不存在与该集合的元素，布隆过滤器有可能会判断说他存在。但是如果布隆过滤器，判断说某一个元素不存在该集合，
+                  那么该元素就一定不在该集合内）
+
+        10G----一个region下面的所有storeFile文件大小的总和  如果超过10G  则会开始是region分裂
+
+         旧region下线 1个 新region上线  2个  重新分配存储路径同事会更新.meta表和root表
+
+zookeeper的职责
+    1zookeeper为HBase提供FailOver机制  选举master  避免单点master故障问题
+    2存储所有的region的寻址入口  -root-表在那台服务器上 -root-这张表的位置信息
+    3实时监控regionserver的状态  将regionserver的上线下线信息实时通过给master
+    4存储HBase的schema  包括有哪些table  每个table有哪些column family
+  /hbase/tbale   相关表的信息
+
+Master职责
+    1为regionServer分配region
+    2负责regionserver 的负载均衡
+    3发现实现的regionserver并重新分配其上的region
+    4HDFS上的垃圾文件hbase回收
+    5处理schema更新请求（表的创建  删除 修改 列簇的增加等等）
+
+RegionServer职责
+    1reginServer维护master分配给它的region  处理对这些region的io请求
+    2RegionServer负责split在运行过程中变得过大的region  负责Compact操作  Compact合并文件  storeFIle文件过小会合并
+
+    Client访问habse上数据的过程并不需要master参与（寻址访问zookeeper和regionserver，数据访问RegionServer）
+    master仅仅维护者table和region的元数据信息  负载很低
+
+    .meta.存的是所有region的位置信息  那么regionServer当中region在进行分裂只有
+    的新产生的region  是由master来决定发到哪个regionServer  这就意味着 只有Master
+    知道new region的位置信息   所以  有master来管理.meta.这个表中的数据crud
+    所以结合以上两点表明,在没有region分裂的情况 maseter宕机一点时间 是可以忍受的
+
+MemStore和storeFile
+    一个Hregion由多个stoire组成  每个store包含一个嫘祖的所有数据
+    store包括位于内存的一个memstore和位于硬盘的多个storeFIle组成
+    写操作先写入memestore  当memstore中的数据量达到某个阈值 ，HRegionServer启动flushCache进程写入到storeFIle，每次写入形成单独一个HFile
+    当总storeFIle大小超过一定阈值之后  会吧region分割成两个，并由Hmaster分配给相应的region服务器 实现负载均衡
+    客户端检索数据是  现在memestore找 找不到再找storedile

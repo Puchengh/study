@@ -1,0 +1,75 @@
+在hbase中弱化库的概念   别为namespace 命名空间
+help+命令
+列簇是建表的时候指定的  列名是插入的时候指定的
+
+表的操作：crud
+  创建表（两种方式）
+    1)create 't1', {NAME => 'f1',VERSIONS => '3'}, {NAME => 'f2'}, {NAME => 'f3'}
+    t1：表名   f1，f2，f3：column family
+    2)create 'students','info','scores'
+    list 查看表信息
+    describe 'students'  查看表的描述信息
+        {NAME => 'info', VERSIONS => '1', EVICT_BLOCKS_ON_CLOSE => 'false', NEW_VERSION_BEHAVIOR => 'false', KEEP_DELETED_CELLS => 'FALSE', CACHE_DATA_ON_WRITE => '
+        false', DATA_BLOCK_ENCODING => 'NONE', TTL => 'FOREVER', MIN_VERSIONS => '0', REPLICATION_SCOPE => '0', BLOOMFILTER => 'ROW', CACHE_INDEX_ON_WRITE => 'false
+        ', IN_MEMORY => 'false', CACHE_BLOOMS_ON_WRITE => 'false', PREFETCH_BLOCKS_ON_OPEN => 'false', COMPRESSION => 'NONE', BLOCKCACHE => 'true', BLOCKSIZE => '65
+        536'}
+        TTL：生命周期  FOREVER-->永久保存
+        VERSIONS：保存的版本  默认是1
+
+        {NAME => 'scores', VERSIONS => '1', EVICT_BLOCKS_ON_CLOSE => 'false', NEW_VERSION_BEHAVIOR => 'false', KEEP_DELETED_CELLS => 'FALSE', CACHE_DATA_ON_WRITE =>
+         'false', DATA_BLOCK_ENCODING => 'NONE', TTL => 'FOREVER', MIN_VERSIONS => '0', REPLICATION_SCOPE => '0', BLOOMFILTER => 'ROW', CACHE_INDEX_ON_WRITE => 'fal
+        se', IN_MEMORY => 'false', CACHE_BLOOMS_ON_WRITE => 'false', PREFETCH_BLOCKS_ON_OPEN => 'false', COMPRESSION => 'NONE', BLOCKCACHE => 'true', BLOCKSIZE => '
+        65536'}
+  表中插入数据:
+    put 't1', 'r1', 'c1', 'value'
+    t1:表名
+    r1：行键   rowkey
+    c1：列名   这里的列名需要指定列簇    'info:age'  列名随意
+    value:列的值
+    put 'students','001','info:name','puchen'
+
+
+    写完之后里吗去hdfs查看 并没有看到数据 关闭hbase之后重启之后发现有数据证明写入数据的时候先写到缓存中
+    在进行hbase关闭的时候从缓存中flush出来
+    全表扫描的命令
+        scan+表名     全表扫描表
+
+    hdfs上的存储路径
+    /hbase/data/default/t_user/9a2fcd938158e0424ba111b3f5286eff/cf1/67825116388a4459a79da724dccd7292
+    data：存储数据目录
+    default：命名空间的目录
+    t_user：表名
+    9a2fcd938158e0424ba111b3f5286eff：regoin的编号
+    cf1：列簇
+    67825116388a4459a79da724dccd7292：列簇存储的文件----专业术语：Hfile  每一个Hfile文件对应的是一个列簇
+
+    get 'students','001'
+    students：表名
+    001：rowkey的值
+    get 't1', 'r1', {TIMERANGE => [ts1, ts2]}
+    get 'students', {COLUMNS => [info,scores] STARTROW => '',ENDROW => ''}
+
+  删除数据
+    delete 't1', 'r1', 'c1', ts1
+
+  清空表数据：
+    truncate 'students'
+        disable 't1'  首先禁用一个标
+        trauncate 't1'  在清空一个标
+              隐藏的一步--->又启用了这个表
+  删除标数据
+  drop 'students'  要先删除一个标才能禁用一个表
+
+  改表数据
+    alter 't1', NAME => 'f1', VERSIONS => 5  如果存在，修改了列簇的信息
+    alter 't1', NAME => 'f1', VERSIONS => 5  如果不存在，增加了列簇的信息
+**********************************************************************************************************************
+VERSIONS： 建表的时候不指定版本 默认1  最终保存1个版本  这个版本是最新的（时间戳最大）版本
+          指定版本  3  最多保存的版本是  3个版本最新的3个版本   同一条数据
+TTL：生命周期  FOREVER-->永久保存  数据保存的时间  超过这个生命周期  数据会被自动删除
+    FOREVER-->永久保存
+    create 't1', {NAME => 'f1',VERSIONS => '3'}   //TTL的单位是s     生命周期完了之后数据会自动删除
+    TTL的时间不是建表时间   认识数据插入时间开始计时 针对的是数据   cell  针对的是单元格
+
+########列簇一旦创建，名字修改不了,如果想修改列簇名，删除了之后重新添加###########
+
