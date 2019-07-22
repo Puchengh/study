@@ -1,0 +1,80 @@
+声明变量
+val a = 123   不可以改变的 （scala推荐使用）
+    val s:Int = 123  声明变量的类型
+var s = "java"   这个值是可以改变的
+
+scala的值类型有七种：(无引用类型)
+    Byte
+    Char
+    Short
+    Int
+    Long
+    Float
+    Double
+
+yield 把每次循环的值放到一个集合当中
+
+Scala的集合有三大类 ：Seq(序列) Set(集合)  Map(映射)
+Seq(序列)
+
+lazy修饰一个变量
+
+函数式编程:
+
+面向对象
+    /**
+      * 声明类是不需要加public关键字  默认就是public
+      * 一个类文件可以声明多个类
+      */
+    object修饰的是伴生对象 就做静态类
+
+    用val修饰的属性  只有get方法   用var修饰的属性有get 和set方法
+
+    用private修饰的属性  该属性属于对象私有变量，只有本类才能访问  伴生对象也访问不到
+
+    在类后面加属性的时候  如果不能使用var或val修饰  则不能访问
+
+
+高阶函数
+    函数当做参数传进去
+
+    柯里化：把多个接受参数的函数转变成接受一个参数的函数
+
+    柯里化的实现过程
+    1）
+    def currying(x: Int)(y: Int) = x * y
+    ======》
+    val curry = currying(3) _ //转换成一个单一的函数  就是确定一个值  然后另外的一个值是随机的  不变的
+    2）
+    def m2(x: Int)(implicit y: Int = 5) = x * y   //实现了柯里化的过程
+    3）
+    def curry(x: Int) = (y: Int) => x * y
+    val func = curry(2)
+    然后调用func(4)
+
+implicit val x = 100   //改变隐式的柯里化的值 更具柯里化的过程的值
+
+//把数组里面的元组的第二个值相加
+val arr = Array(("scala",1),("scala",2),("scala",3))
+arr.foldLeft(0)(_ + _._2)
+
+隐式转换和隐式参数
+    作用:能够丰富现有类库的功能,对类的方法进行增强
+    隐式转换函数:以implicit关键字声明并带有单个参数的函数
+    richInt  里面有to方法
+    Predef  里面放了很多的隐式转换
+:implicit -v  ----------->查看scala的隐式转换     此设计模式为 ----- 装饰模式
+
+    门面模式--->是指提供一个统一的接口去访问多个子系统的多个不同的接口，
+               它为子系统中的一组接口提供一个统一的高层接口。
+
+泛型：
+    [B <: A] UpperBound  上界： B类型的上界是A类型  即B类型的父类是A类型
+    [B >: A] LowerBound  下届： B类型的下届是A类型  即B类型的子类是A类型
+    [B <% A] ViewBound 表示B类型要转换成A类型，需要一个隐式转换函数
+    [B : A]  ContextBound  需要一个隐式转换的值
+    [-A,+B]
+        [-A]  逆变  作为参数类型，如果A是T的子类  那么C[T]是C[A]的子类
+        [+B]  协变  作为返回类型  如果B是T的子类  那么C[B]是C[T]的子类
+
+

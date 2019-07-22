@@ -1,0 +1,64 @@
+java基础增强
+    集合  反射   设计模式  常见的排序算法
+    多线程  锁
+    并发编程和RPC通信
+
+集合Collection
+    单值                                      键值对
+    List            Set                      Map            接口
+    ArrayList      HashSet                   HashMap
+    LinkedList     TreeSet                   TreeMap
+    Vector         LinkedHashSet             HashTable
+    Stack                                    ConcurrentHashMap
+
+List    --开辟连续的内存存储空间
+ArrayList：
+    底层实现是数组 查找快 增删慢
+    数组一旦定义长度不变  初始化默认没有指定长度  默认初始化长度是10
+    add()  数组初始化长度添加第一个元素的时候设置10这个长度
+    右移一位  除以2
+    左移一位  乘以2
+
+    int newCapacity = oldCapacity + (oldCapacity >> 1);    //1.5oldCapacity
+
+    扩容的时候是1.5倍的开始扩容的
+    接下来就是数组的拷贝
+    什么时候用有参构造指定初始容量:  List集合中添加的元素数量比较多的时候   1000
+        给定初始化的值  在一定程度上提升性能
+    元素比较少的时候就可以指定初始容量
+    ArrayList元素的最大值不能超过Integer.MAX_VALUE Integer的最大值  21亿  据统计超过10亿 性能较低
+
+
+LinkedList：链表结构   交替查找  左边右边循环查找  最终返回是离哪段近的那个  线程安全的
+    查询慢  增删块   1.8中代表的是双向链表
+    item信息
+    Node节点  代表的就是链表中的每一个元素   pre和nest信息  添加新的node的时候last节点node才会给nest赋值
+    双向链表  node节点会存储三部分信息 prv item  nest
+
+set：无序不重复    没有添加循序
+hashSet 数组：遍历的性能太低   遍历的方式
+        所有元素存储的时候  存储的元素的hashCode值  当成索引
+        任何一种hashCode的算法都不可能达到绝对的完美   必然会存在hashCode值得冲突
+
+        1.5之前是 桶表+链表      1.8之后变成了  桶表+链表+二叉树
+        链表深度超过8的时候 转化称为二叉树结构   10亿左右的数据
+        桶：默认16   最大2^30   扩容因子：0.75   因为会有hash碰撞的原因    扩容：每次2倍
+        链表:hash算法相同的时候，会吧值相同的放在同一个链表上
+            链表上的元素个数超过8个的时候转化为二叉树   提升查询性能
+        控制桶表的范围   取模余然后放到对应的桶里面
+treeSet  有序的不可重复的  有序的  元素值得大小
+        treeSet中默认的排序：数值类型，按照大阿晓进行升序排序
+                           字符串类型:按照字典顺序进行升序排序、
+                比较器：自然排序比较器
+        自定义类型  conpareTo方法如果返回值为0  则会默认覆盖
+
+map map是set的底层实现
+    hashMap  非线程安全  效率高  key是不可以重复的  可以为null 但是只可以有一个为null
+    hashTable  线程安全的 效率低   key是不可以重复的  不可以为null
+    TreeMap
+    concurrentHashMap  java并发包中的  多线程的  线程安全的  即是线程安全的 又不至于效率过低
+                怎么实现的：分段锁机制
+    读写锁  mysql:     查询--->95%的操作    增删改：5%
+
+    读锁:共享锁   一个线程进行操作的时候不影响另外一个线程的结构
+    写锁：排它锁   一个线程在进行操作的时候不允许其他任何线程的操作

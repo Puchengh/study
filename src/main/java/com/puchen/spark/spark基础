@@ -1,0 +1,74 @@
+Spark的四大特性  https://spark.apache.org/      相对于hadoop块100倍  不仅仅是因为在内存里面操作
+        spark也是磁盘里面工作的
+    Apache Spark™ is a unified analytics engine for large-scale data processing.   统一的分析引擎
+    大多数的操作都是在内存里面  spark也要发生shuffle的操作
+    快速性：
+    易用性：
+    夸平台性：
+    tachyon:内存是的分布式文件系统
+
+RDD 这个概念是抽象出来的  不是一个是在的东西
+    Resilient Distributed Datasets(弹性的分布式的数据集)
+    大多数的操作都是在内存里面  spark也要发生shuffle的操作  shuffle过程必须在去扫描磁盘操作
+
+    1：RDD  分布式的数据集
+    2：弹性的（灵活）  内存存不下的存到磁盘
+    3：分区。默认情况下，HDFS里面的一个文件块就对象RDD里面的一个分区
+    4：分区容错性   自动完成的
+
+    Spark架构  主从架构  主节点master 从节点worker
+    Driver master worker Executor task
+        Driver服务器：在某种特定的情况下  spark代码在哪台服务器上提交  哪台就是Driver服务器
+            1.首先会启动一个Driver服务器  在任务初始化的过程中  会去找Master   mater就接受了这个请求
+            2.Master接收到了这个请求以后  他会发送请求给worker   要求启动Excutor   这里就是在请求资源调度
+                配合完成  standAlone模式   类似yarn里面的ResourceManager  可以进行整个资源的调度
+            3.所有的Executor反向注册到Driver服务器中
+            4.Exector向Driver注册完了以后 saprk的代码才会真正的执行 默认情况下一个分区就是一个task
+                一般情况下  一个任务会有对个分区  会有多个task。这些task会封装到TaskSet中
+            5.这些task会被发送到Exector里面  这个任务就会去Executor执行
+    Spark集群搭建（Standalone）
+        Master
+        Worker
+        首先要搭建Hadoop集群  Spark是由SparkHA模式的
+            1.基于Zookeeper
+            2.基于HDFS（基本不用）
+
+                        hadoop1           hadoop2           hadoop3
+    NameNode               是
+    DataNode               是                是                是
+    SecondaryNameNode                        是
+    Master                 是
+    Worker                 是                是                 是
+
+        spark on yarn
+
+    RDD的创建方式
+
+    方式一：testFile读取文件
+    1）读取本地文件
+    2）读取HDFS的文件
+    方式二:并行化的方式创建RDD
+        大多数这种方式是用在测试的时候
+    sc.parallelize转化成为一个RDD
+    方式三:
+        由一个RDD转换为另外一个RDD
+        FileRDD -> wordRDD
+    方式四:
+        可以有其他变化而来
+        SparkCore  RDD  核心的抽象
+        SparkSQL  RDD
+    脚本的说明: 1 重命名  2 脚本全路径操作
+
+    Transformation 和Action    ---sqpark支持两种类型的操作
+    Transformmation的操作就是针对一个RDD创建新的一个RDD
+    Action的操作通常就是  针对最后一个RDD的操作
+
+    Transformation的操作具有lazy的特性  所以必须在执行一个action方法的时候才会执行
+    一个流程是可以有Transformation但是不能没有action操作
+
+    shared variables(共享变量)
+
+    Broadcast variables(广播变量)  这是一个调优操作  变成广播变量之后只会把变量的副本发送到每一个Executor里面去  让其他的每个task共享副本
+    Accumulators(累加变量) 这不是一个调优的操作  是一个方案 rdd.map(number => sum += number)  这样执行出来的代码时不一样的   所以要变成累加变量  这个和mapreduce里面的计数器是一样的
+
+

@@ -1,0 +1,85 @@
+RDD的持久化
+    spark的cache操作
+    RDD.cache  这是一个transformation操作   count()这个action算子会触发这个操作
+    两个操作相同
+    RDD.persist(StorageLevel.MEMORY_ONLY) = RDD.cache
+    RDD.unpersist()  释放内存  不然有可能会把内存里面的数据挤掉
+
+    MEMORY_ONLY  把数据缓存到内存
+    MEMORY_AND_DISK  把数据缓存到内存，内存放不下，放到磁盘
+    MEMORY_ONLY_SER  把数据放入内存实现序列化
+    (Java and Scala)
+    MEMORY_AND_DISK_SER  把数据放入内存和磁盘实现序列化
+    (Java and Scala)
+    DISK_ONLY   这个是放到磁盘 不放到内存
+    MEMORY_ONLY_2, MEMORY_AND_DISK_2, etc.  放到内存和磁盘 有两个副本
+    OFF_HEAP (experimental)  针对tachyon   堆外存
+
+    多次使用这个RDD就可以持久化这个RDD，rdd的持久化是一个调优的操作
+    当数据存在磁盘中的时候 代码运行完了之后 缓存会被释放
+Checkpoint(sc.setCheckpointDir("hdfs://192.168.31.205/checkPoint"))
+    RDD在运行的时候
+    1)有没有缓存  如果有缓存那么就到缓存里面去取
+    2)如果没有缓存   判断一下有没有checkpoint，如果有那么就从checkpoint里面去读数据
+    3)如果都没有   从头开始计算
+spark的运行模式
+
+    本地模式  idea和ecplise上运行的模式不启动任何的worker和master  master local[*]
+        如果使用master local默认=master  local[*]
+
+    stabdalone
+     spark-sehll --master spark://bigdata-senior01.chybinmy.com:7077
+
+         ./bin/spark-submit \
+           --class org.apache.spark.examples.SparkPi \
+           --master spark://207.184.161.138:7077 \
+           --deploy-mode cluster \    ---指定任务的运行模式   client和cluster模式  如果不指定就是client模式
+           --supervise \
+           --executor-memory 20G \   ---每个memeory的内存大小
+           --total-executor-cores 100 \   ---每个executor有5个核
+           /path/to/examples.jar \
+           1000     --指定参数
+
+    Yarn
+        切换成yarn模式   spark_en.sh
+        添加如下参数  指定提交到哪个Yarn下面
+        export HADOOP_CONF_DIR=XXX     ---hadoop的目录的 /hadoop/etc/hadoop
+        ./bin/spark-submit \
+          --class org.apache.spark.examples.SparkPi \
+          --master yarn \
+          --deploy-mode cluster \  # can be client for client mode
+          --executor-memory 20G \
+          --num-executors 50 \
+          /path/to/examples.jar \
+          1000
+        使用yarn参数很清楚
+        HistoryServer
+            standalone模式   如何查看sqpark的任务运行   ip:8080
+            yarn：historyServer   只帮助管理MarReduce的任务
+            配置spark的historyServer
+    Mesos
+
+
+    collect()  大多数的场景 大多使用在测试的时候  可能会使用内存溢出
+
+    二次排序   就是很多个条件选择组合排序
+
+    窄依赖和宽依赖
+    在RDD中 分为两种类型
+    窄依赖：就是指父RDD的每个分区被子RDD的一个分区使用  map filter union
+    宽依赖：就是指父RDD的分区被子RDD的多个分区所依赖 groupByKey join(除了一个特殊情况 西安经过groupByKey 之后再join属于窄依赖)
+
+    名词
+    Application   提交的一个任务就叫做一个Application
+    Application jar   提交任务的时候打的jar包  那么提交任务的那个jar包就是Application jar
+    Driver program  1)-client -cluster 可以选择Dirver  2)去申请资源  executor会想Driver进行注册  Driver发送Tesk给Executor
+    cluster manager   这个是一个集群的资源管理器  那么可以表现为 standalone  yarn mesos
+    Deploy mode  运行模式 有两种  一种是clinet cluter
+    workernode  运行任务的机器  通常是在standalone模式下才有这个服务
+    executor  我们的spark任务是在executor里面去运行
+    task  真正运行任务的
+    job 一个Application里面可以有多个job   每遇到一个action操作就会生成一个job
+    stage  阶段 job是分阶段的  stage的划分算法
+    -----stage的划分算法
+
+

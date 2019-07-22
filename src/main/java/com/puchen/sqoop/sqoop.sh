@@ -4,7 +4,7 @@ sqoop export \
 --password Aa123456 \
 --table SYS_EXT_AREA \
 --export-dir /user/root/SYS_EXT_AREA \
---columns ID,NAME,PID,SORT,LEVEL_EXT,LONGCODE,CODE  \
+--columns ID,NAME,PID,SORT,LEVEL_EXT,LONGCODE,CODE,SIMPLE_NAME  \
 --input-fields-terminated-by "\t" \
 --input-lines-terminated-by "\n" \
 --input-null-string "\\\\N" \

@@ -1,0 +1,15 @@
+DataFrames
+在spark中 DataFrame是一种以RDD为基础的分布式数据集，类似传统数据库中的二维表格
+DataFrame与RDD的主要区别在于  前者带有schema原信息
+即DataFrame所表示的二维数据集的每一列都带有名称和类型   这使得spark SQL得以通茶更多的结构信息
+从而对藏于DataFrame背后的数据源以及作用于DataFrame之上的变换进行了针对性的优化
+最终达到大幅提升运行时效率的目标  反观RDD  由于无从得知所存数据元素的具体内部结构
+Spark core只能在stage层面进行简单 通用的流水线优化
+
+Spark SQL Core
+spark SQL的核心是吧已有的RDD  带上schema信息   然后注册成类似sql里的table  对其进行sql查询
+这里面主要分两部分，一是生成SchemaRDD  二是执行查询
+正如RDD的各种变换实际上只是在构造RDD DAG,DataFrame的各种变换同样也是lazy的
+他们并不直接求出计算结果 而是将各种变换组装成与RDD DAG类似的逻辑查询计划
+如前所述  由于DataFrame带有dchema元信息  Spark SQL的查询优化器得以通茶数据和计算的精细结构
+从而实行具有很强针对性的优化  随后  经过优化的逻辑执行计划翻译为物理执行计划  并最终落实到RDD DAG
