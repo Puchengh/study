@@ -71,4 +71,6 @@ RDD 这个概念是抽象出来的  不是一个是在的东西
     Broadcast variables(广播变量)  这是一个调优操作  变成广播变量之后只会把变量的副本发送到每一个Executor里面去  让其他的每个task共享副本
     Accumulators(累加变量) 这不是一个调优的操作  是一个方案 rdd.map(number => sum += number)  这样执行出来的代码时不一样的   所以要变成累加变量  这个和mapreduce里面的计数器是一样的
 
-
+区别:
+Hadoop：MapRedcue由Map和Reduce两个阶段，并通过shuffle将两个阶段连接起来的。但是套用MapReduce模型解决问题，不得不将问题分解为若干个有依赖关系的子问题，每个子问题对应一个MapReduce作业，最终所有这些作业形成一个DAG。
+Spark：是通用的DAG框架，可以将多个有依赖关系的作业转换为一个大的DAG。核心思想是将Map和Reduce两个操作进一步拆分为多个元操作，这些元操作可以灵活组合，产生新的操作，并经过一些控制程序组装后形成一个大的DAG作业。

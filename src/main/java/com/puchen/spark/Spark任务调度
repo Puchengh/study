@@ -1,0 +1,32 @@
+DAG  有向无环图  从HDFS开始 到HDFS输出结束
+    DAGScheduler  划分stage
+    TaskScheduler  调度task的
+提交任务
+    1. spark提交了任务  那么就会产生一个Application任务  同事也会找到一台Driver服务器
+    2.是由spark-sumit提交的
+    3.提交任务以后 代码开始运行 首先就要进行sparkcontext代码的初始化  new SparkCOntext初始化的时候  1）创建一个DAGScheduler  2）创建了一个 taskScheduler
+    4.taskScheduler会向master进行注册，master就开干活  去worker调度资源
+    5.启动Executor
+    6.Executor启动了以后 去向Driver服务器进行注册   这样Dirver就知道哪些Excutor为哪些Application任务服务了
+        接著就等待遇到action的操作.每遇到一个action就生成一个job  把生成的这个job提交给DAGScheduler
+        DAGScheduler会根据stage的划分算法把一个job任务划分成为多个stage 同时为每个stage创建一个taskSet集合
+    7.DAGSchedualer会把这些TaskSet发送给TaskSchedualer
+    8.TaskSchedualer会把TashSet发送给Executor  一个task就是一个线程  进行序列化和饭序列化  把task的线程放到Executor的线程池里面去
+        线程会进行start和run()方法
+    9.Executor会把发动过来的额task进行反序列化 丢到线程池里面去  去执行这个线程的方法
+
+spark core的调优
+    1.开发调优
+        1)创建重复的RDD  代码量多了之后会混淆 创建重复的RDD
+        2)尽可能复用同一个RDD  当一个RDD有需要的值的时候 避免创建多余的RDD
+        3)对多次使用的RDD进行持久化  多使用persist（storageLevel.MEMORY_AND_DISK_SER） 代替cache()
+        4)尽量避免使用shuffle类算子  会发生宽依赖的算子都会触发shuffle操作
+            shuffle的操作涉及到磁盘  网络传输  shuffle也会造成数据倾斜
+        5）使用mao-side预聚合的shuffle操作
+    2.数据倾斜调优
+    3.shuffle的调优
+    4.资源调优
+    5.大数据的JVM调优（hadoop，spark，hbase，选择合适的JVM的参数，垃圾回收器）
+
+
+
