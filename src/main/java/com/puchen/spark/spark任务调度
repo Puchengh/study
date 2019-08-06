@@ -1,0 +1,108 @@
+DAG  有向无环图  从HDFS开始 到HDFS输出结束
+    DAGScheduler  划分stage
+    TaskScheduler  调度task的
+提交任务
+    1. spark提交了任务  那么就会产生一个Application任务  同事也会找到一台Driver服务器
+    2.是由spark-sumit提交的
+    3.提交任务以后 代码开始运行 首先就要进行sparkcontext代码的初始化  new SparkCOntext初始化的时候  1）创建一个DAGScheduler  2）创建了一个 taskScheduler
+    4.taskScheduler会向master进行注册，master就开干活  去worker调度资源
+    5.启动Executor
+    6.Executor启动了以后 去向Driver服务器进行注册   这样Dirver就知道哪些Excutor为哪些Application任务服务了
+        接著就等待遇到action的操作.每遇到一个action就生成一个job  把生成的这个job提交给DAGScheduler
+        DAGScheduler会根据stage的划分算法把一个job任务划分成为多个stage 同时为每个stage创建一个taskSet集合
+    7.DAGSchedualer会把这些TaskSet发送给TaskSchedualer
+    8.TaskSchedualer会把TashSet发送给Executor  一个task就是一个线程  进行序列化和饭序列化  把task的线程放到Executor的线程池里面去
+        线程会进行start和run()方法
+    9.Executor会把发动过来的额task进行反序列化 丢到线程池里面去  去执行这个线程的方法
+
+spark core的调优
+    1.开发调优
+        1)创建重复的RDD  代码量多了之后会混淆 创建重复的RDD
+        2)尽可能复用同一个RDD  当一个RDD有需要的值的时候 避免创建多余的RDD
+        3)对多次使用的RDD进行持久化  多使用persist（storageLevel.MEMORY_AND_DISK_SER） 代替cache()
+        4)尽量避免使用shuffle类算子  会发生宽依赖的算子都会触发shuffle操作
+            shuffle的操作涉及到磁盘  网络传输  shuffle也会造成数据倾斜
+        5）使用map-side预聚合的shuffle操作
+            groupByKey   发生map结果之后   上游有多少数据那么下游也会有多少数据
+            尽量使用reduceByKey使数据量大量减少   在map端进行预聚合
+        6）使用高性能的算子
+            使用reduceByKey/aggregateByKey替代groupByKey
+            使用mapPartitions替代普通map（大部分的情况下）  但是有的时候，使用mapPartitions会出现OOM（内存溢出）的问题
+            使用foreachPartitions替代foreach  当数据写入到mysql的时候 再配上数据库连接池
+            使用filter之后进行coalesce操作 数据量变小 分区不变 会造成资源浪费  可以减少分区
+            使用repartitionAndSortWithinPartitions替代repartition与sort类操作
+                    如果需要在repartition重分区之后，还要进行排序，建议直接使用repartitionAndSortWithinPartitions算子
+                    因为该算子可以一边进行重分区的shuffle操作，一边进行排序。shuffle与sort两个操作同时进行，比先shuffle再sort来说，性能可能是要高的。
+        7）广播大变量
+            使用外部的变量 每个task都有一个list1的副本
+            广播后的变量，会保证每个Executor的内存中，只驻留一份变量副本，而Executor中的task执行时共享该Executor中的那份变量副本。这样的话，可以大大减少变量副本的数量，
+            从而减少网络传输的性能开销，并减少对Executor内存的占用开销，降低GC的频率。
+        8）使用Kryo优化序列化性能（写到磁盘和网络传输）
+            序列化和反序列化   默认使用的java的序列化机制 就是ObjectOutputStream/ObjectInputStream API来进行序列化和反序列化
+            MEMORY_ONLY_SER 减少内存空间
+            消耗更少的CPU和空间
+            ##真正开发的时候 不会使用默认的java机制  而是用这个Kryo去实现序列化
+                cache -> Executor(,缓存数据,用来运行代码) -> new -> fukkGC 会跑所有的线程
+            // 创建SparkConf对象。
+            val conf = new SparkConf().setMaster(...).setAppName(...)
+            // 设置序列化器为KryoSerializer。
+            conf.set("spark.serializer", "org.apache.spark.serializer.KryoSerializer")
+            // 注册要序列化的自定义类型。
+            conf.registerKryoClasses(Array(classOf[MyClass1], classOf[MyClass2]))
+        9）优化数据结构(下面这些场景对性能要求特别高的时候，造成的问题是代码不容易维护和阅读)  --> 这样尽可能的较少内存占用，从而减低GC频率，提升性能
+           1)Java对象：对象头是16个字节   进行开发的时候 尽量不适用对象  用json字符串
+           2)Java字符串 要耗费多少额外的字节（40个字节  char[]来维护他的序列） 字符串里面有字符，每个字符2个字节 UFT-16编码
+                如果一个字符串里面有5个字符，那么应该占的是50个字节
+           3)Java集合 List HashMap等等 其实很消耗内存  我们应该能用原生数组的就用原生数组 Array[]
+        10）本地化数据 Data Locality（数据本地性，是针对task而言的）
+            PROCESS_LOCAL  task -> Executor(数据)  task和处理的数据在同一个Executor   默认分配任务是按照这种方式的
+            NODE_LOCAL   在同一个节点  但是在不同的进程
+            NO_PREF   task对运行在哪里不敏感  MySQL
+            RACK_LOCAL  数据和task在同一个机架
+            ANY 数据和task在不同机架
+
+            spark.localoty.wait: 3s    --->有点偏少
+            spark.locality.wait.proess: 30s
+            spark.locality.wait.node:  10s
+            如果在合适的时候，性能还是有明显的上升的
+
+    2.数据倾斜调优
+    3.shuffle的调优
+    4.资源调优
+    5.大数据的JVM调优（hadoop，spark，hbase，选择合适的JVM的参数，垃圾回收器）
+
+shuffle相关参数调优
+    以下是Shffule过程中的一些主要参数，这里详细讲解了各个参数的功能、默认值以及基于实践经验给出的调优建议。
+
+    spark.shuffle.file.buffer
+    默认值：32k
+    参数说明：该参数用于设置shuffle write task的BufferedOutputStream的buffer缓冲大小。将数据写到磁盘文件之前，会先写入buffer缓冲中，待缓冲写满之后，才会溢写到磁盘。
+    调优建议：如果作业可用的内存资源较为充足的话，可以适当增加这个参数的大小（比如64k），从而减少shuffle write过程中溢写磁盘文件的次数，也就可以减少磁盘IO次数，进而提升性能。在实践中发现，合理调节该参数，性能会有1%~5%的提升。
+    spark.reducer.maxSizeInFlight
+    默认值：48m
+    参数说明：该参数用于设置shuffle read task的buffer缓冲大小，而这个buffer缓冲决定了每次能够拉取多少数据。
+    调优建议：如果作业可用的内存资源较为充足的话，可以适当增加这个参数的大小（比如96m），从而减少拉取数据的次数，也就可以减少网络传输的次数，进而提升性能。在实践中发现，合理调节该参数，性能会有1%~5%的提升。
+    spark.shuffle.io.maxRetries
+    默认值：3
+    参数说明：shuffle read task从shuffle write task所在节点拉取属于自己的数据时，如果因为网络异常导致拉取失败，是会自动进行重试的。该参数就代表了可以重试的最大次数。如果在指定次数之内拉取还是没有成功，就可能会导致作业执行失败。
+    调优建议：对于那些包含了特别耗时的shuffle操作的作业，建议增加重试最大次数（比如60次），以避免由于JVM的full gc或者网络不稳定等因素导致的数据拉取失败。在实践中发现，对于针对超大数据量（数十亿~上百亿）的shuffle过程，调节该参数可以大幅度提升稳定性。
+    spark.shuffle.io.retryWait
+    默认值：5s
+    参数说明：具体解释同上，该参数代表了每次重试拉取数据的等待间隔，默认是5s。
+    调优建议：建议加大间隔时长（比如60s），以增加shuffle操作的稳定性。
+    spark.shuffle.memoryFraction
+    默认值：0.2
+    参数说明：该参数代表了Executor内存中，分配给shuffle read task进行聚合操作的内存比例，默认是20%。
+    调优建议：在资源参数调优中讲解过这个参数。如果内存充足，而且很少使用持久化操作，建议调高这个比例，给shuffle read的聚合操作更多内存，以避免由于内存不足导致聚合过程中频繁读写磁盘。在实践中发现，合理调节该参数可以将性能提升10%左右。
+    spark.shuffle.manager
+    默认值：sort
+    参数说明：该参数用于设置ShuffleManager的类型。Spark 1.5以后，有三个可选项：hash、sort和tungsten-sort。HashShuffleManager是Spark 1.2以前的默认选项，但是Spark 1.2以及之后的版本默认都是SortShuffleManager了。tungsten-sort与sort类似，但是使用了tungsten计划中的堆外内存管理机制，内存使用效率更高。
+    调优建议：由于SortShuffleManager默认会对数据进行排序，因此如果你的业务逻辑中需要该排序机制的话，则使用默认的SortShuffleManager就可以；而如果你的业务逻辑不需要对数据进行排序，那么建议参考后面的几个参数调优，通过bypass机制或优化的HashShuffleManager来避免排序操作，同时提供较好的磁盘读写性能。这里要注意的是，tungsten-sort要慎用，因为之前发现了一些相应的bug。
+    spark.shuffle.sort.bypassMergeThreshold
+    默认值：200
+    参数说明：当ShuffleManager为SortShuffleManager时，如果shuffle read task的数量小于这个阈值（默认是200），则shuffle write过程中不会进行排序操作，而是直接按照未经优化的HashShuffleManager的方式去写数据，但是最后会将每个task产生的所有临时磁盘文件都合并成一个文件，并会创建单独的索引文件。
+    调优建议：当你使用SortShuffleManager时，如果的确不需要排序操作，那么建议将这个参数调大一些，大于shuffle read task的数量。那么此时就会自动启用bypass机制，map-side就不会进行排序了，减少了排序的性能开销。但是这种方式下，依然会产生大量的磁盘文件，因此shuffle write性能有待提高。
+    spark.shuffle.consolidateFiles
+    默认值：false
+    参数说明：如果使用HashShuffleManager，该参数有效。如果设置为true，那么就会开启consolidate机制，会大幅度合并shuffle write的输出文件，对于shuffle read task数量特别多的情况下，这种方法可以极大地减少磁盘IO开销，提升性能。
+    调优建议：如果的确不需要SortShuffleManager的排序机制，那么除了使用bypass机制，还可以尝试将spark.shffle.manager参数手动指定为hash，使用HashShuffleManager，同时开启consolidate机制。在实践中尝试过，发现其性能比开启了bypass机制的SortShuffleManager要高出10%~30%。

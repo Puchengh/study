@@ -7,7 +7,7 @@ DataFrame与RDD的主要区别在于  前者带有schema原信息
 Spark core只能在stage层面进行简单 通用的流水线优化
 
 Spark SQL Core
-spark SQL的核心是吧已有的RDD  带上schema信息   然后注册成类似sql里的table  对其进行sql查询
+spark SQL的核心是把已有的RDD  带上schema信息   然后注册成类似sql里的table  对其进行sql查询
 这里面主要分两部分，一是生成SchemaRDD  二是执行查询
 正如RDD的各种变换实际上只是在构造RDD DAG,DataFrame的各种变换同样也是lazy的
 他们并不直接求出计算结果 而是将各种变换组装成与RDD DAG类似的逻辑查询计划
