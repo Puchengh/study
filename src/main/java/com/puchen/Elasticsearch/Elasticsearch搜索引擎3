@@ -1,0 +1,180 @@
+19.如何定位不合法的搜索以及原因
+在加上搜索添加的查询执行计划
+GET /test_index/test_type/_validate/query?explain   --->查看合法性  下面加上查询太条件
+{
+    "query":{
+        "match":{
+            "test_field":"test"
+        }
+    }
+}
+
+一般用在特别复杂和庞大的搜索下  比如一下写了上百行的代码，这个时候可以先用validate api去验证一下，搜索是否合法
+
+20.如何定制搜索结果的排序规则
+(1)默认排序规则  默认情况下 是按照score降序排序的
+(2)自定义查询排序规则
+GET /_search{
+    "query":{
+        "constant_score":{
+            "filter":{
+                "range":{
+                    "age":{
+                        "gte":30
+                    }
+                }
+            }
+        }
+    },
+    "sort":[
+    {
+        "join_date":{
+            "order":"asc"
+        }
+    }
+    ]
+}
+
+21.如果对一个string field进行排序，结果往往不准确，因为分词后是多个单词，在排序就不是我们想要的结果了
+通常解决方案是，见给一个string field建立两次索引，一个分词，用来进行搜索；一个不分词，用来进行排序
+首先先建立索引
+PUT /website
+{
+    "mappings":{
+        "article":{
+            "properties":{
+                "title":{
+                    "type":"text",
+                    "fields":{
+                        "raw":{
+                            "type":"string,
+                            "inex":"not_analyzed"
+                        }
+                    },
+                    "fielddata":true     --->正排索引
+                },
+                "context"：{
+                    "type":"text"
+                },
+                "post_date":{
+                    "type":"date"
+                },
+                "author_id":{
+                    "type":"long"
+                }
+            }
+        }
+    }
+}
+
+查询
+GET /website/article/_search
+{
+    "query":{
+        "match_all":{}
+    },
+    "sort":[
+    {
+        "title.raw":{
+            "order":"desc"
+        }
+    }
+    ]
+}
+注意：排序的文本不同，title.raw使用的是整个字符串去排序   title这个是部分分词去排序
+
+22.相关度评分TF&IDF算法独家解密
+(1)算法介绍
+relevance score算法，简单来说，就是计算出 一个索引中的文本，与搜索文本  他们之间的关联匹配配程度
+Elasticsearch 使用的是 term frequency/inverse document frequency算法，简称为TF/IDF算法
+Term frequency:搜索文本中的各个词条在field文本中出现了多少次，出现次数越多，就越相关
+    搜索请求：hello world  拆分词条之后出现的词条越多  说明这个月相关
+    doc1:hello you,and world is very good
+    doc2:hello,how are you
+Inverse document frequency:搜索文本中的各个词条在整个索引的所有文档中出现可多少次，出现的次数越多，就越不相关
+    doc1:hello,tody is very good
+    doc2:hi world, how are you
+    比如说 在index中有1万条document，hello这个单词在所有的document中 一共出现了1000次  world1这个单词在所有的document中，一共出现了100次
+    doc2相关度分数更高  出现的次数越多  相关度分数越低
+FIeld-length norm：field长度，field越长，相关度越弱
+
+GET /_search?explain
+{
+    "query":{"match":{"tweet":"honeymoon"}}
+}
+(2)_score是如何被计算出来的
+GET /_search?explain
+{
+    "query":{"match":{"tweet":"honeymoon"}}
+}
+
+(3)分析一个document是如何被匹配上的
+GET /website/article/12/_explain
+{
+    "query":{
+        "bool":{
+            "filter":{"term":{"author_id":2}},
+            "must":{"match":{"title":"honeymoon"}}
+        }
+    }
+}
+
+23.内核 doc value
+搜索的时候  要依靠倒排索引，排序的时候 需要依靠正排索引  看到每个document的每个field，然后进行排序，所谓的正排索引，其实就是doc value
+建立索引的时候，一方面会建立倒排索引，以供搜索用，一方面也会建立正排索引，也就是doc value,以供排序，聚合，过滤使用。
+doc vlaue是被保存在磁盘上的，此时如果内存足够，os会自动将其缓存在内存中，性能还是会很高，如果内存不足够，os将其写入到磁盘上
+doc1:hello world you and me
+doc2:hi,world,how are you
+
+24.分布式搜索引擎内核 query phase
+(1)query phase
+    *搜索请求发送到某一个coordinate node 构建一个priority queue，长度以paging操作from和size为准，大小为from+size, 默认为10
+    *coordinate noe将请求转发到所有的shard  每个shard本地搜索 并构建一个本地的prioirty queue
+    *各个shard将自己的priority queque返回给coordinate njoede  并构建一个全局的priority queue
+(2)replica shard如何提升搜索吞吐量
+    一次请求要达到所有shard的一个replica/primary上去，如果每个shard都有多个replica，
+    那么同时并发过来的搜索请求可以同时打到其他的replica上去
+
+25.分布式搜索引擎内核 fetch phase
+(1)fetch phase的工作流程
+    *coordinate node构建完成priority queue之后，就发送mget请求去所有的shard上获取对应的document
+    *各个shrad将document返回给coordinate node
+    *coordinate node将合并后的document结果返回给client客户端
+(2)一般搜索，如果不加from和size，就默认搜索前10条，按照_score排序
+
+总结：query phase结束后 获取到的是一对doc id等信息，就会发送mget api去各个shard上批量一次性获取自己要的数据
+    每个shard获取到了对应的document之后，就会返回给coordinate node，coordinate node拿到所有的document，返回给client
+
+26.搜索相关参数梳理 bouncing results问题解决方案
+(1)perference
+决定了那些shard会被用来执行搜索操作
+primary, _primary_first, _local, _only_node:xyz, _preger_node:xyz, _shards:2,3
+bouncing result问题，两个document排序，field值相同，不同的shard上，可能排序不停，每次请求轮询打到不同的shard上，每次页面上看到的搜索结果的排序都不一样，
+这就是douncing result，也就是跳跃的结果
+解决方案就是讲preference设置为一个随机的字符串，比如说user_id,让每个user每次搜索的时候，都是用同一个shard去执行，就不会看到bouncing results了
+(2)timeout 已经讲解过原理了  主要就是在限定一定的时间内，将部分获取到的数据直接返回，避免查询时间过长
+(3)reouting document文档路由，_id路由，routing=user_id,这样的话可以让同一个user对应的数据到一个shard上去
+(4)search_type
+dfs_query_then_fetch,可以替身revelance sort精准度
+
+27.基于scoll技术滚动搜索大量数据(搜索海量数据的时候使用  和分页的使用场景不一样   scoll主要是用来一批一批检索数据 让系统进行处理)
+如果一次性要查出来比如10万条数据 那么性能会很差，此时一般会采用scoll滚动查询，一批一批的查，知道所有数据都查询完处理完
+
+使用scoll滚动搜索，可以先搜索一批数据，然后在搜索一批数据，以此类推，搜出来全部的数据
+scoll搜索会在第一次搜索的时候，保存一个当时的试图快照，之后只会基于该旧的试图快照提供数据搜索，如果这个期间数据变更，是不会让用户看到的
+采用基于_doc进行排序的方式，性能较高
+每次发送scoll请求，我们还需要指定一个scoll参数，指定.一个时间窗口，每次搜索请求只要在这个时间窗口能完成就可以了
+GET /old_index/_search?scroll=1m
+{
+    "query":{"match_all":{}},
+    "sort":["_doc"],
+    "size":1000
+}
+
+获得的结果会有一个scoll_id,下一次在发送scoll请求的时候，必须岛上这个scoll_id
+GET /_search/scoll
+{
+    "scroll":"1m",
+    "scroll_id":"FGHJKUIJGJHKHBJKLHJNMK"
+}
+size会发送给每个shard，因此每个最多会返回size*primary shard条数据

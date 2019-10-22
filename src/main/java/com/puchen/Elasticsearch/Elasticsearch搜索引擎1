@@ -1,0 +1,183 @@
+1.GET _search
+took:整个所搜请求花费了多少毫秒
+_shards:shards fail的条件（primary和replica全部挂掉），不影响其他的shard。搜索请求发送到了多个shard上去  默认情况下来说，会打到一个idnex的所有primary shard上去，当然了，每个primary shard都可能会有一个或者多个replica shard，
+所以请求也可以到primary shard的其中一个replcia shard上去
+hits.total:本次搜索返回了多少条结果
+hits.max_score:本次搜索的所有结果中，最大的相关分数是多少，每一条docuemnt对于search的相关度，越相关，_score分数越大，排位越靠前
+hits.hits:默认查询前10条，完整数据，_score降序排序
+timeout：默认无timeout，latency平衡completeness，手动指定tiemout timeout查询执行机制
+    timeout机制 指定每个shard  就只能在timeout时间范围内，将搜索到的部分数据(也可能是全部都搜索到了)
+    直接立即返回 给client程序，而不是等到所有的数据全都拿出来以后在返回。确保说，一次搜索请求可以再用户指定的tiemout时长内完成，为一些对时间敏感应用搜索提供良好的支持。
+应用
+GET _search?imeout=10ms,timeout=1s,timeout=1m
+
+2.multi-index和multi-type搜索模式 以及搜索原理  如何一次性搜索多个idnex下多个type的值
+/_search： 所有索引，所有type下的所有数据都能搜出来
+/index1/_search: 指定一个index, 搜索其下所有的type的数据
+/index1,index2/_search: 同时搜索两个index下的数据
+/*1,*2/_search: 通配符都可查询出来多个索引
+/index1/test_type/_search: 搜索一个index下指定的type的数据
+/index1/type1,type2/_search:  可以搜索一个index下多个type的数据
+/index1,index2/type1,type2/_search: 多个index下多个typede的数据
+/_all/type1,type2/_search: 所有index下的多个type的数据
+
+3.搜索的原理
+client发送一个搜索请求，会把请求打到所有的primary shard上去执行，因为每个shard都包含部分数据，
+所以每个shard上都可能会包含搜索请求的结果  但是如果primary shard有replica shard，那么请求也可以打到replica shard上去
+
+分页搜索以及deep paging性能问题
+(1)讲解如何使用es进行分页搜索的语法
+size 查询多少条数据
+from 从多少条数据开始查询
+GET /_search?size=10
+GET /_search?size=10&from=0
+GET /_search?size=10&from=20
+(2)什么是deep paging(深度分页)问题？为什么会产生这个问题，他的底层原理是什么？
+请求可能是打到一个不包含这个index的shard的node上去  这个node就是一个coordinate node  那么这个coordinate node就会将搜索请求转发到index的
+三个shard所在的node上去。比如我们刚才的情况下，要搜索60000条数据中的第1000页，实际情况下，每个shard都要将内部的20000条数据中的第10001-10010条数据，
+拿出来，不是才10条，是10010条数据，3个shard每个shard都返回10010条数据给coordinate node会受到总共30030条数据，然后在这些数据中进行排序，_score,相关度
+分数，去除自己需要的的1000页的数据，就是正好是10条数据
+搜索的过深的时候，就需要在coordinate node上保证大量的数据，还要进行大量数据的排序，排序之后，在去除对应的那一页，
+所以这个过程，即耗费网络带宽，耗费内存，还耗费CPU。所以deep paging的性能问题，我们应该尽量避免出现这种deep paging操作。
+
+4.query string search语法以及_all metadata原理揭秘
+(1)
+GET /_all/type1/_search?q=content:test
+GET /_all/type1/_search?q=+content:test   --必须要包含test这个字段
+GET /_all/type1/_search?q=-content:test   --查询结果一定不包含test这个字段的
+(2)_all metedata的原理和作用
+GET /_search?q=elasticsearch  不管是那个field只要包含就会查出来
+直接可以搜索所有的field，任意一个field包含指定的关键字就可以搜索出来，我们在进行搜索中的时候偶，难道是对document中的field都搜索一次吗？不是的
+_all元数据，document all fields at index time,支持all fields search
+es中的_all元数据，在建立索引的时候，我们插入一条document，她里面包含了多个dield，此时 es会自动将多个field的值，全部用字符串的方式串联起来，
+变成一个长的字符串，作为_all field的值，通知建立索引。
+后面如果在搜索的是偶，没有对某个field指定搜索，就默认搜索_all field,其中是包含了所有的field的值的
+举个例子
+{
+    "name":"jack",
+    "age":26,
+    "email":"jack@sina.com",
+    "address":"guangzhou"
+}
+"jack 26 java#sina.com guangzhou"作为一条document的_all field的值，同事进行分词后建立对应的倒排索引
+生产环境不使用
+
+5.mapping是什么？
+插入几条数据，让es自动为我们建立索引
+尝试各种的搜索：
+GET /website/article/_search?q=2017     3条结果
+GET /website/article/_search?q=2017-01-01    3条结果
+GET /website/article/_search?q=post_date:2017-01-01    1条结果
+GET /website/article/_search?q=post_date:2017   1条结果
+
+自动或者手动为index中的type建立的一种数据结构和相关设置，简称为mapping
+dynamic mapping  自动为我们建立index，创建type，以及对应的mapping，mapping中包含了每个field对应的数据类型，以及如何分词等设置
+我们当然  后面会简介，也可以手动在创建数据之间 先创建index和type，以及type对应的mapping
+GET /website/_mapping/article  查看这个type下的所有的mapping
+
+搜索结果为什么不一致，因为es自动建立mapping的时候，设置了不同的field  不同的data type。不同的data type的分词 搜索行为都是不一样的。所以出现了_all field和
+post_date field的搜索表现完全不一样。
+
+6.精确匹配与全文搜索的对比分析
+(1)exzct vlaue精确匹配
+(2)full text 全文检索
+    *缩写vs全程  sn vs china
+    *格式转化  like liked likes
+    *大小写  Tom vs  tom
+    *同义词  like vs love
+    就不是说单纯的只匹配完成的一个值，而是可以对值进行查拆分词语(分词)进行匹配，也可以通过缩写，时态，大小写，同义词等进行匹配
+
+7.倒排索引核心原理快速揭秘
+
+分词  初步的刀片索引的建立  吧所有的单词拆开
+
+word doc1 doc2
+搜索
+
+mother liked little dog.不可能有任何结果
+normalization  建立倒排索引的时候 会执行一个操作 也就是说对拆分出的各个单词进行相应的处理，一提升后面搜索的时候能够搜索到相关联的文档的概率
+mom -> mother
+liked -> like
+little -> little
+dog -> dog
+先分词  在进行索引
+重新建立倒排索引，加入normoalization  再次用mother liked little dog搜索  就可搜索到了
+
+
+8.分词器的内部组成  和内置分词器的介绍
+(1)分词器  切分词语  normalization (提升recall召回率)
+给一段句子   将这个句子炒粉成一个一个的单个的词语  同时对每个单词进行normalization(时态转换  单复数转换)  分词器
+character filter:  在一段文本进行分词之前，西安进行预处理，比如最常见的就是过滤HTML标签  & ---> and
+tokenizer:分词  hello you and me -->  hello , you , and , me
+token  filter: lowercase, stop word,   干掉一个  a/an/the  等等
+一个分词器很重要，将一段文本进行各种处理 ，最后处理好的结果才会拿去建立倒排索引
+
+(2)内置分词器的介绍
+Set the shape to sermi-transparent by calling set_trans(5)
+standard analyzer: set, the, shape, to, semi,transparent, by, calling, set_trans, 5
+aimple analyzer: set, the, shape, to, semi, transparent, by, calling, set,trans
+whitespace analyzer: Set, the,shape, to,semi-transparent, by, calling, set_trans(5)
+language analyzer(特定的语言的分词器，比如说 english,英语分词器): set, shape, semi, transpar, call, set_tran, 5
+
+9._query string的分词以及mapping引入案例
+(1)query string分词
+query string必须以和index建立时相同的analyzer进行分词
+query string对exact value和fulltext的区别对待
+dateL exact value
+_all: full text
+比如我们有一个document，其中有一个field，包含的value是：hello you and me  建立倒排索引
+我们要搜索这个document对用的index  搜索文本是hello me，这个搜索文本就是query string
+query string  默认情况下，es会使用它对应的field建立倒排索引时相同的分词器去进行分词，分词和normalization，只有这样，才能实现改正确的搜索
+我们建立倒排索引的时候，将dogs  --> dog  结果你搜索的时候 还是一个dogs  那不就搜索不到了么  所以搜索的时候 那个dogs也必须变成dog才行  才能搜索到。
+
+不同类型的field 可能有的就是full text 有的就是exact value
+post_date  date: exact value
+_all:full text 分词 narmalization
+
+(2)mapping引入案列遗留问题
+GET /_search?q=2017
+    document搜索的是_all field,document所有的field都会拼接成一个打穿 进行分词
+    _all 2017 自然会搜索到3个document
+GET /_search?q=2017-01-01
+    _all 2017-01-01 query string 会用跟倒排索引一个的分词器去进行分词
+GET /_search?q=post_date:2017-01-01
+    post_date是一个exact value   2017-01-01 只是一条数据
+GET /_search?q=post_date:2017
+    post_date  es5.2之后的优化  对分词器进行了优化
+(3)测试分词器
+GET /_analyze
+{
+    "analyzer":"standard",
+    "text":"Text to analyzer"
+}
+
+10.mapping回归
+(1)往es里面直接插入数据  es会自动建立索引 同事建立type以及对应的mapping
+(2)mapping中就自动定义了每个field的数据类型
+(3)不同的数据类型(比如text和date) 可能有的是ezact value,有的是full text
+(4)exact value  在建立倒排索引的时候  分词的时候 试讲整个值一起作为一个关键词建立倒排索引中的，full text，会经历各种各样的处理  分词 normaliaztion(时态
+转换，同义词转换，大小写转换)，才会建立到倒排索引中
+(5)同时呢   exact value和full text类型的filed就决定了 在一个搜索过来的时候  对exact value field或者是full text field进行搜索的行为也是不一样的，
+会建立倒排索引的行为保持一致，比如说exact value 搜索的时候  就是直接按照整个值进行匹配的  full text query string也会进行分词和normalization再去倒排索引中去搜索
+(6)可以用es的dynamic mapping,让其自动建立mapping  包括自动设置数据类型 也可以提前手动创建index和type的mapping  自己对各个field进行设置  保罗数据类型 包括索引行为
+包括分词器 等等
+
+mapping 就是idnex 的type的元数据  每个type都有一个自己的mapping  决定了数据类型 建立倒排索引的行为 还有进行搜索的行为
+
+11._mapping的可信数据类型以及dynamic mapping
+(1)核心的数据类型
+String
+byte short integer long
+float double
+boolean
+date
+(2)dynamic mapping
+true or false --> boolean
+123   --> long
+123.45   -->  double
+2017-01-01 --> date
+"hello world"  -->  string
+(3)查看mapping
+GET /index/_mapping/type
+
+

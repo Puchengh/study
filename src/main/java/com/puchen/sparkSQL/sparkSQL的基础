@@ -1,0 +1,24 @@
+Spark推出了shark，shark与hive实际上还是紧密关联的，shark都城很多东西还是依赖于Hive
+但是修改了内存管理，物理计划，执行三个模块，底层使用了Spark的基础内存的计算模型
+从而让性能比hive提升了数倍上百倍
+shark底层一来了hive的语法解析器，查询优化器等组件，因此对于其性能的提升还是造成了制约，推出了sparkSQL
+SparkSQL的特点：
+    1支持多种数据源：hive RDD Parquet Json JDBC等
+    2多种性能优化技术：in-memory columnar storage,byte-code generation,cost model动态评估
+    3组件扩展性 对应SQL的语法解析器，分析器以及优化器 用户都可以自己重新开发 并且动态扩展
+
+SparkSQWL的性能优化技术简介
+    1内存列存储
+    内存列存储 sparkSQL的数据 不是使用JAVA对象的方式来进行存储，而是使用面向列的内存存储的方式
+    来进行存储，也就是说，每一列 作为一个数据存储的单位。从而大大又花了内存使用的效率
+    曹勇了内存列存储之后，减少了对内存的消耗，也就避免gc大量数据的性能开销
+    2字节码生成技术
+    SparkSQL在器catalyst模块的expressions中增加了codegen模块 对于SQL语句中的计算表达式
+    比如select num _ num from t 这种的sql  就可使用动态字节码生成技术来优化其性能
+    3Scala代码编写的优化
+    对于scala代码编写中 可能会造成较大性能开销的地方 自己重新  使用更加复杂的方式来获取更好的
+    性能。比如Optione样例类，for循环，map、filter、foreach等高阶函数，以及不可变对象，都改成了用null
+    while循环等来实现，并且重用可变的对象
+
+SparkSQL最重要的功能之一就是从hive中查询数据
+DataFrame可以通过很多来源进行构建，包括：结构化的数据文件 hive中的表  外部的关系型数据库 以及RDD

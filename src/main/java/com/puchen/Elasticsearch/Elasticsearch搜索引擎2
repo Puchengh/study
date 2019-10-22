@@ -1,0 +1,226 @@
+12.定制string类型数据如何建立索引以及分词
+(1)如何建立索引
+analyzed
+not_analyzed
+no
+(2)修改mapping
+只能创建index时手动建立mapping,或者新增field mapping  但是不能uodate field mapping
+
+手动建立
+PUT /website{
+    "mappings":{
+      "article":{
+        "properties":{
+            "author_id":{
+                "type":"long"
+            },
+            "title":{
+                "type":"text",
+                "analyzer":"english"
+            },
+            "content":{
+                "type":"text"
+            },
+            "post_date":{
+                "type":"date"
+            },
+            "publisher_id":{
+                "type":"text",
+                "index":"not_analuzed"
+            }
+        }
+      }
+    }
+}
+
+尝试手动修改mapping的时候会报错
+
+新加上一个mapping属性能够成功
+PUT /website/_mapping/article
+{
+    "properties":{
+        "tags":{
+            "type":"text"
+        }
+    }
+}
+
+(3)测试mapping   如果属性没有分词器  使用分词器去检索的话会报错
+GET /website/_analyze
+{
+    "field":"content",
+    "text":"a dog"
+}
+
+GET /website/_analyze
+{
+    "field":"tags",
+    "text":"my-dogs"
+}
+
+
+13._mapping复杂数据类型 以及object类型数据底层结构
+(1)multivalue field  {"tags":["tags1","tags2"]} tags是具有相同类型的数据
+(2)empty field  null,[],[null]  都是空的数据
+(3)object field  包含一个属性的json对象
+例子1
+{
+    "address":{
+        "country":"china",
+        "province":"shannxi",
+        "city":"xian"
+    },
+    "name":"jack",
+    "age":27,
+    "join_date":"2017-01-01"
+}
+底层存储是这样的
+{
+    "name":[jack],
+    "age":[27],
+    "join_date":[2017-01-01],
+    "address.country":[china],
+    "address.province":[shannxi],
+    "address.city":[city]
+}
+例子2
+{
+    "authors":[
+        {"age":26,"name":"jack"},
+        {"age":55,"name":"tom"},
+        {"age":28,"name":"kitty"}
+    ]
+}
+上述的底层存储是这样的
+{
+    "authers.age":[26,55,39],
+    "authors.name":[jack,tom,kitty]
+}
+
+
+14._search api的基本语法
+(1)search api的基本语法
+GET /search{}
+GET /inex1,inex2/type1,type2/search{}
+GET /_search{
+    "from":0,
+    "size":10
+}
+(2)http协议中get是否可以带上request body
+HTTP协议 一把不允许get请求带上request body，但是因为get更加适合藐视查询数据的操作  因此还是这么用了
+GET /_search?from=0&size=10
+POST /_search{
+    "from":0,
+    "size":10
+}
+如果遇到不支持的场景，也可以用POST /_search
+
+15.query DSL的语法
+(1)query DSL的基本语法
+GET /_search{
+    "query":{
+        "match_all":{}
+    }
+}
+GET /text_index/index_type/_search
+{
+    "query":{
+        "match":{
+            "text_field":"test"
+        }
+    }
+}
+多个条件组合搜索
+例子 title必须包含elasticsearch， cintent可以包含elasticesearch  也可以不包含   atuhor_id必须不为111
+GET /index/type/_search
+{
+    "query":{
+        "bool":{
+            "must":[
+            {
+                "match":{
+                    "title":"elasticsearch"
+                }
+            }
+            ],
+            "should":[
+                "match":{
+                    "conctent":"elasticsearch"
+                }
+            ],
+            "must_not":[
+                "match":{
+                    "author_id":"111"
+                }
+            ]
+        }
+    }
+}
+
+16.filter与query深入对比解密
+(1)filter与query示例
+GET /index/type/_search
+{
+    "query":{
+        "bool":{
+            "must":{
+                "match":{
+                    "field1":"content"
+                }
+            },
+            "filter":{
+                "range":{
+                    "field2":{"gt":30}
+                }
+            }
+        }
+    }
+}
+(2)filter(过滤)与query(搜索)对比
+filter 仅仅只是按照搜索条件过滤需要的数据而已
+query 会去计算每个doucment相对于搜索条件的相关度  并按照相关度进行排序
+一般来说 如果你是在进行搜索  需要将最匹配搜索条件的数据先返回  那么用query，如果你只是要根据一些条件筛选出一部分数据，不关注其排序，那么用filter
+除非是你的这些搜索条件 你希望越符合这些搜索条件的document越排在前面返回  那么这些搜索条件放置在query中
+如果你不希望一些搜索条件影响的document排序 那么放在filter中即可
+(3)filter与query性能
+filter(轻量) 不需要计算相关度分数  不需要按照相关度分数进行排序  同时还有内置的自动的cache最常用的filter的功能
+query(重量) 相反  要计算相关度分数 按照分数进行排序 而且并不cache结果
+
+
+
+17.query搜索语法
+(1)match
+GET /_search{"query":{"match":{"title":"elasticsearch"}}}
+(2)multi match  在fields中的两个字段中去查找符合multi_match文本的数据
+GET /_search{"query":{"multi_match":"full text search","fields":["test_field","test_field1"]}}}
+(3)range query
+GET /_search{"query"：{"range":{"age":{"gte":30}}}}
+(4)term query  term不会把query string查询的东西分词  必须要是完全符合query string的查询条件
+GET /_search{"query":{"term":{"age":30}}}
+(5)terms query  对某个字段指定多个查询的值
+GET /_search{"query":{"terms":{"tags":["search","full_text","nosql"]}}}
+(6)exist query  指的是查询的字段不能为空(2.X中的查询)
+GET  /_search{"query":{"exists":{"field":"title"}}}
+
+18.多搜索条件组合搜索查询
+bool
+    "query"---->must  must_not  should
+    "filter"---->filter
+filter是没有根据相关度分数查询的，所以每个插叙都会计算一个document针对他的相关度分数，然后bool综合所有分数，合并为一个分数，当时filter是不会计算分数的
+
+###在单独只需要使用filter单纯过滤的时候必须加上一个constant_score
+GET /conpany/employee/_search
+{
+    "query":{
+        "constant_score":{
+            "filter":{
+                "range":{
+                    "age":{
+                        "gte":30
+                    }
+                }
+            }
+        }
+    }
+}
+

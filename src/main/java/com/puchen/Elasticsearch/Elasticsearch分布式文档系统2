@@ -1,0 +1,116 @@
+1.bulk语法
+每一次操作都要两个json串  语法如下
+{"action":{"metadata"}}
+{"data"}
+举列子 比如你现在要创建一个文档  放bulk里面 看起来会是这样子的：
+{"index":{"_index":"test_index","_type","test_type","_id":"1"}}
+{"test_field1":"test1","test-field2":"test2"}
+有哪些类型的操作可以执行？
+bulk api对json的语法，有严格的要求，每个json串不能换行，只能放一行，同事一个json串和一个json串之间，必须有一个换行
+(1)delete:删除一个文档  只要一个json串就可以了
+(2)create：PUT /index/type/id/_create  强制创建
+(3)index:普通的put操作，可以是创建文档，也可以是全量替换文档
+(4)update：执行的partial update操作
+    POST /_bulk
+    {"delete":{"_index":"test_index","_type":"test_type","_id":10}}
+    {"create":{"_index":"test_index","_type":"test_type","_id":3}}
+    {"test_field":"test3"}
+    {"index":{"_index":"test_index","_type":"test_type","_id":4}}
+    {"test_field":"test4"}
+    {"update"：{"_index":"test_index","_type":"test_type"."_id":"1","_retry_on_conflict":"3"}}
+    {"doc":{"test_field2":"bulk_test1"}}
+2.什么是distirbuted document store（分布式文档系统）
+
+Elasticsearch跑起来以后其实起到的第一个最核心的功能  就是一个分布式的文档数据存储系统。ES是分布式的。
+文档数据存储系统，文档数据，存储系统。
+文档数据：es可以存储和操作json文档的类型的数据，而且这也是es的核心数据结构
+存储系统：es可以对json文档系统的数据进行存储，查询，创建，更新，删除等等操作。其实已经起到了一个什么样的效果？其实ES满足了这些功能，就可以说已经是一个NoSQL的存储系统了
+围绕着document在操作，其实就是吧es当成了一个NoSQL存储引擎，一个可以存储文档类型的存储系统，在操作里面的document
+es可以作为一个分布式的文档存储系统，所以说我们的应用系统，是不是就可以基于这个概念，去进行相关的应用程序的开发了。
+什么类型的应用程序呢？
+(1)数据量大，es的分布式本质，可以帮助快速进行扩容，承载大量数据
+(2)数据结构灵活多变，随时可能会变化，而且数据结构之间的关系，非常复杂，如果我们用传统数据库，要面临大量的表
+(3)对数据的相关操作，较为简单，比如就是一些简单的增删改查，用我们之前讲解的那些document操作就可以搞定
+(4)NoSQL数据库，适用的也是类似于上面的这种场景
+举个例子，比如说像一些网站系统，或者是普通的电商系统，博客系统，面向对象概念比较复杂，但是作为终端网站来说，没有什么太复杂的功能，就是一些简单的CRUD操作，而且
+数据量可能还比较大，这个时候选用ES这种NOSQL型的数据存储，比传统的复杂的功能务必强大的智齿SQL的关系型数据库，更加合适一些。无论是性能，还是吞吐量，可能都会更好。
+
+(1)document路由到shard上是什么意思
+一个idnex的数据会被分为多片，每片都会在 一个shard中，所以数一个document，只能存在于一个shard中。
+当客户端闯将document的时候，es此时就需要决定说，这个document是放在这个index的哪个shard上  这个过程就称之为document routing 数据路由
+(2)路由算法 shard=hash(routing)%number_of_primary_shards
+举个例子  一个idnex有3个primary shard  p0 p1 p2
+每次增删盖茶一个document的时候  都会带过去一个routing number  默认就是这个document的_id(可能是手动指定 也可能是自动生成)
+routing = _id
+会将这个routing值  传入一个hash的函数中，产出一个routing值的hash值   hash(routing) = 21
+然后将hash函数产出的值对这个index的primary shard的数量求余数  21 % 3 = 0
+就决定了 这个document就放在P0上
+决定了一个doucment在哪个shard上  最重要的一个值就是routing值 默认是——id，也可以手动指定  相同routing值，每次过来从hash函数中 产出的hash值一定是相同的
+无论hash值是几  无论是什么数字，对number_of_primary_shards求余数，结果一定是在0~number_of_primary_hsards-1之间这个范围内的。 -----0,1,2
+(3)_id or custom routing value
+默认的rotuign就时_id
+也可以在发送请求的时候  手动指定一个routing value  比如说 put /index/type/id?routing=user_id
+手动指定routing value是很有用的  可以保证说  某一类的document一定被路由到一个shard上去，那么在后续进行应用级别的负载均衡，以及提升批量读取的性能的时候，是很有帮助的。
+(4)primary shard数量不可变的谜底
+primary shard 一旦index建立，是不允许被改变的，但是replica shard是可以随时改变的.
+例子：创建一个document
+_id=1 hash = 21  21 % 3 = 0 --p0
+get /index/type/1或获取这个document
+_id=1 hash =21  21 % 4 = 1  ---p1   就会去p1上去寻找，结果发现找不到，间接导致数据丢失。
+
+3.剖析document增删改内部实现原理
+(1)客户端选择一个node发送请求过去  这个node就是coordinating node(协调节点)
+(2)coordinating node 对document进行路由，将请求转发给对应的node(有 primary shard)
+(3)实际的node上的 primary shard处理请求，然后将数据同步到replica node
+(4)coordinating node 如果发现primary node和所有replica node都搞定之后，就返回相应结果给客户端
+
+3.写一致性原理以及quorum机制
+(1)consistency,one(primary shard),all(all shard),quorum(default)
+我们在发送任何一个增删改操作的时候 比如put /index/type/id,都可以带上一个consistency参数，指明我们想要的写一致性是什么？
+one: 要求我们这个写操作，只要primary shard和replica shard都是活跃的，才能执行这个写操作
+all: 要求我们这个写操作，必须所有的primary shard和replica都是活跃的，才可以执行这个写操作
+quorum：默认的值，要求所有的shard中，必须大部分的shard都是活跃的，可用的，才可以执行这个写操作
+    如果shard总共有3个primary 和replica=1的话  那么总共3个shard是活跃的 才能够保证写操作
+(2)quorum机制，写之前必须确保大多数shard可用，int(primary + number_of_replicas)/2+1,当number_of_replicas时才生效
+quorum = int((primary + number_of_replicas)/2)+1
+举个例子  3个primary shard，number_of_replicas=1  总共有3 + 3*1 = 6个shard
+quorum = int （（3+1）/2）+1 = 3
+所以 要求6个shard中至少有3个shard是active状态的，才可以执行这个写操作
+(3)如果节点数少于quorum数量，可能导致quorum不齐全，进而导致无法执行人格写操作
+3个primary shard，replica=1，要求至少3个shard是active，3个shard按照之前学习的shard&replica机制，必须在不同的节点上，如果说只有2台机器的话，是不是有可能说，3个
+shard都没有办法分配齐全，此时就可能会出现写操作无法执行的情况
+es提供了一种特殊的处理场景，就是说当number_of_replica>1时才生效，入围假如说 primary shard，replica=1 此时就2个shard
+（1—+1）/2+1=2  要求必须有两个shard是活跃的，但是可能就1个noede，此时1个shard是活跃的，如果不特殊处理的话，导致我们单节点集群就无法工作。
+(4)quorum不齐全是  wait  默认1分钟 timeout,100,30s
+等待期间，期望活跃的shard数量可以增加，最后实在不行，就会timeout
+我们其实可以在写操作的时候，加一个timeout参数，比如说put /index/type/id?timeout=30  这个就是自己去设定quorum不齐全的时候 es的tiemout时长，可以缩短，也可以增长。
+
+4.document查询内部实现原理
+(1)客户端发送请求到任意一个noed 称为coordinate node
+(2)coordinate node对document进行路由，将请求转发到对应的node，此时会使用round-robin随机轮询算法，在primary shard以及其所有replica中随机选择一个，让读者请求负载均衡
+对于读请求 不一定将请求妆发到primary shard上去，也可以妆发replica shard上去，因为replica shard是可以服务所有的读请求的
+采取roudn-robin随机轮询算法，比如说coordinate node接收到对一个document的4次查询，就会使用算法，将2次查询请求转发给p1,将2次查询请求转发给R1  尽量让primary shard和所有的reolica shard均匀的服务读请求，得到负载均衡的效果
+(3)接受请求的node返回document给coordinate node
+(4)coordinate node返回document给客户端
+(5)特殊情况：document如果还在建立索引过程中，可能只有primary shard有，任何一个replica都没有，此时可能会导致无法读取到document，但是document完成索引建立之后，primary shard和relipca shard就都有了
+
+
+5._bulk奇特的json格式与底层性能优化关系大解密
+(1)bulk中的每个操作都可能要转发到不同的node的shard去执行
+(2)如果采用比较良好的json数组格式
+循序人的换行，整个可读性非常棒，读起来比较干爽，es那倒那种标准格式的json串以后，要按照下述流程去进行处理
+    *将json数组解析为JSON Array对象 这个时候 整个数据就会在内存中出现一份一模一样的拷贝，一份数据是json文本，一份数据是JSONArray对象，
+    *解析josn数据里的每个json，对每个请求中的document进行路由
+    *为路由到同一个shard上的多个请求，创建一个请求数组
+    *将这个请求数组序列化
+    *将序列化后的数据发送到对应的节点上去
+(3)耗费更多的内存，更多的jvm gc开销
+bulk size最佳大小的问题  一般说建议在几千条样子，然后大小10MB左右
+假设说现在100个bulk请求发送到一个节点上去，然后每个请求是10MB，100个请求，就是1000MB-1GB  然后每个请求json都copy一份jsonArry 内存翻倍
+占用更多的内存可能就会积压其他请求的内存使用量，比如说最重要的搜索请求，分析请求等等   此时就可能会导致其他请求的性能急速下降
+另外的话，占用内存更多，回就回导致java虚拟机的垃圾回收次数更多，跟频繁，每次要回收的垃圾对象更多，耗费的时间更多，导致es的java虚拟机停止工作线程的时间更多
+(4)现在的奇特格式
+    *不用将其转换为json对象，不会出现内存中的相同数据拷贝，直接按照换行符切割json，尽可能提高性能和效率
+    *对每两个一组个json  读取meta  进行document路由
+    *直接将对应的json发送到node上去
+(5)最大的优势在于不需要将json数据解析为一个json Array对象，形成一份大数据的拷贝，浪费内存空间.

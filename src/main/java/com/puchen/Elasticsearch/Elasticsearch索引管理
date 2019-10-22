@@ -1,0 +1,246 @@
+1.索引管理
+    (1)创建索引的示例
+    PUT /my_index
+    {
+        "settings":{
+            "number_of_shards":1,
+            "number_of_replicas":0
+        },
+        "mappings":{
+            "my_type":{
+              "my_field":{"type':"string"}
+            }
+        }
+    }
+    (2)修改一个索引
+    PUT /my_index/_settings
+    {
+        "number_of_replicas":1
+    }
+    (3)删除一个索引
+    DELETE /my_index
+    DELETE /index_one,index_two
+    DELETE /index_*
+    DELETE /_all
+
+    elasticsearch.yml
+    action.destructive_requires_name:true  --->开启之后不能使用DELETE /_all删除所有的索引
+
+2.手动修改分词器以及定制自己的分词器
+    (1)默认的分词器
+    standard
+    standard tokenizer：以单词边界进行切分
+    standard token filter：什么都不做
+    lowercase token filter：将所有字母转化为小写
+    stop token filter(默认被禁用)：移除停用词 比如a the it等等
+    GET /my_index/_analyze
+    {
+        "analyzer":"es_std",
+        "text":"a dog in the house"
+    }
+    (2)修改分词器的设置
+    启用english停用词token filter
+    PUT /my_index
+    {
+        "settings"：{
+            "analysis":{
+                "analyzer":{
+                    "es_std":{
+                        "type":"standard",
+                        "stopwords":"_english_"
+                    }
+                }
+            }
+        }
+    }
+    GET /my_index/_analyze
+    {
+        "analyzer":"es_std",
+        "text":"a dog is in the house"
+    }
+    (3)定制化自己的分词器
+    PUT /my_idnex
+    {
+        "settings"：{
+            "analysis":{
+                "char_filter":{
+                    "&_to_and":{
+                        "type":"mapping",
+                        "mappings":["&=>and"]
+                    }
+                },
+                "filter":{
+                    "my_stopwords":{
+                        "type":"stop",
+                        "stopwords":["the","a']
+                    }
+                },
+                "analyzer":{
+                    "my_analyzer":{
+                        "type":"custom",
+                        "char_filter":["html_strip","&_to_and"],
+                        "tokenizer":"standard",
+                        "filter":["lowercase","my_stopwords"]
+                    }
+                }
+            }
+        }
+    }
+    验证分词器
+    GET /my_index/_analyze{
+        "text":"tom&jerry are a friend in the house,<a>, HAHA!!",
+        "analyzer":"my_analyzer"
+    }
+
+    PUT /my_index/_mapping/my_type
+    {
+        "properties":{
+            "title":{
+                "type":"string",
+                "analyzer":"my_analyzer
+            }
+        }
+    }
+
+3.type底层数据结构
+    type 是一个idnex中用来区分类似的数据的，类似的数据，但是可能有不同的fields，而且不同的属性来控制建立、分词器
+    field的value，在底层的lucene中建立索引的时候，全部是opaque bytes类型，不区分类型的
+    lucene是没有type的概念的，在document中，实际上将type作为一个document的field来存储，即_type,es通过_type来进行type的过滤和帅选
+    一个index中的一个type，实际上是放在一起存储的，因此一个index下，不能有多个type重名，二类型或者其他设置不同的，因为那样是无法处理的
+    {
+        "ecommerce":{
+            "mappings":{
+                "elactronic_goods":{
+                    "properties":{
+                        "anme":{
+                            "type":"string"
+                        },
+                        "price":{
+                            "type':"double"
+                        },
+                        "service_period":{
+                            "'type":"string"
+                        }
+                    }
+                },
+                "fresh_goods":{
+                    "properties":{
+                        "name":{
+                            "type":"string"
+                        },
+                        "price":{
+                            "type":"doucle"
+                        },
+                        "eat_period":{
+                            "type":"string"
+                        }
+                    }
+                }
+            }
+        }
+    }
+    底层是这样存储的
+    {
+        "ecommerce":{
+            "mappings":{
+                "_type":{
+                    "type":"string",
+                    "index":"not_analyzed"
+                },
+                "name":{
+                    "type":"string"
+                },
+                "price":{
+                    "type":"double"
+                },
+                "service_period":{
+                    "type":"string"
+                },
+                "eat_period":{
+                    "type":"string"
+                }
+            }
+        }
+    }
+    最佳实践，将类型结构的type放在一个index下，这些type应该有多个field是相同的
+    假如说，你将两个type的field完成不同，放在一个index下，那么久每天数据都只要有一般的field在底层的lucene中是空值，会有严重的性能问题
+4.mapping root object的刨析
+    (1)root object
+    就是某个type对应的maooing json，包括了properties，metada（_id,_source,_type）,settings(analyzer),其他settings(比如include_in_all)
+    PUT /my_index
+    {
+        "mappings":{
+            "my_type":{
+                "properties":{}
+            }
+        }
+    }
+    (2)properties
+    type,index,analyzer
+    PUT /my_index/my_type/_mapping
+    {
+        "my_type":{
+            "properties":{
+                "title":{
+                    "type":"string",
+                    "index":"analyzed",
+                    "analyzer":"standard"
+                }
+            }
+        }
+    }
+    (3)_source好处
+    *查询的时候，直接可以拿到完整的document，不需要先拿document id，在发送一次请求那document
+    *partial update基于_source实现
+    *reindex时，直接基于_source实现，不要从数据库(或者其他外部存储)查询数据在修改
+    *可以基于_source定制返回field
+    *debug query更容易，因为可以之间看到_source
+    如果不需要上述好处，可以禁用_source
+    PUT /my_index{
+        "mappings":{
+            "my_type":{
+                "_source":{
+                    "enabled":false
+                }
+            }
+        }
+    }
+    (4)_all
+    将所有field打包在一起  作为一个_all field，建立索引，没有指定人格field进行搜索是，就是使用_all field在搜索
+    PUT /my_index/_mapping/my_type
+    {
+        "my_type":{
+            "_all":{"enabled":false}
+        }
+    }
+    也可以在field级别设置include_all field,设置是否将field得知包含在_all field中
+    PUT /my_index/my_type/_mapping
+    {
+        "my_type":{
+            "include_in_all":false
+        }
+    }
+    (5)标识性metadata
+    _index,_type,_id
+
+5.定制化自己得dynamic mapping策略
+(1)定制dynamic策略
+true 遇到陌生字段 就进行dynamic mapping
+false 遇到陌生字段 就忽略
+strice  遇到陌生字段  就报错
+(2)定制dynamic mapping策略
+*默认会按照一定格式识别date,比如yyyy-MM-dd,但是如果某个field先过来一个2017-01-01的值，就会被自动dynamci mapping成date,后面如果再来一个hello world之类的值就会报错，
+可以手动关闭某个type的date_detection,如果有需要 自己手动指定某个field为date类型
+PUT /my_index
+{
+    "mappings":{
+        "my_type":{
+            "date_detection":false
+        }
+    }
+}
+*定制自己的dynamic maooing template(type level)
+
+(3)
+
+

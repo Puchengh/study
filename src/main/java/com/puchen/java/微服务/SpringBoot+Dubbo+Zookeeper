@@ -75,9 +75,7 @@ Zookeeper      服务的注册与发现  是通过Znode，watch机制来通信�
     ZAB的奔溃回恢复的重要参数
 
     主节点挂了 无法访问  进入崩溃恢复阶段 所有从节点发起投票 zh ID  -->选举出准主节点状态
-
     同步节点  吧leader刚才手机得到的最新历史事务日志，把同步集群中所有的Follower，只有半数Follower同步成功，这个准Leaser才能称为正式的Leaser
-
     ZAB的数据写入
     ZAB 的数据写入涉及到 Broadcast 阶段，简单来说，就是 Zookeeper 常规情况下更新数据的时候，由 Leader 广播到所有的 Follower。其过程如下：
 
@@ -101,13 +99,10 @@ Zookeeper      服务的注册与发现  是通过Znode，watch机制来通信�
                                                           2  没有等待锁的队列，只能在客户端自己来等锁，效率低下
 # 分布式锁
     这是雅虎研究员设计 Zookeeper 的初衷。利用 Zookeeper 的临时顺序节点，可以轻松实现分布式锁。
-
 # 服务注册和发现
     利用 Znode 和 Watcher，可以实现分布式服务的注册和发现。最著名的应用就是阿里的分布式 RPC 框架 Dubbo。
-
 # 共享配置和状态信息
     Redis 的分布式解决方案 Codis，就利用了 Zookeeper 来存放数据路由表和 codis-proxy 节点的元信息。同时 codis-config 发起的命令都会通过 ZooKeeper 同步到各个存活的 codis-proxy。
-
     此外，Kafka、HBase、Hadoop，也都依靠Zookeeper同步节点信息，实现高可用。
 
 

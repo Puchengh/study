@@ -1,0 +1,71 @@
+1.Elasticsearch 对复杂的分布式机制的透明隐藏特性
+    Elasticsearch是一套分布式的系统  分布式是为了应对大数据量
+    隐藏了复杂了分布式机制  对我们彻底透明
+    分片机制  （我们之前随便就将一些document插入到es集群中去了 我们没有care过数据是怎么进行分片的  数据到那个shard中，
+    cluster discovery（集群发现机制，我们之前在做个那个集群status从yellow转green的实验中  直接启动了第二个es进程
+    那个进程 作为一个node自动发现了集群），并且加入了进去 那个进程作为一个node自动就发现了集群
+    并且加入了进去  还接受了部分数据 replica shard）
+    shard负载均衡（举例） 假设现在又3个节点  总共有25个shard要分配到3个节点上去  es会自动进行均匀分配 以保持每个节点的均衡的读写负载请求
+    shard副本 请求路由 集群扩容 shard重分配
+
+    复杂的分布式机制  比如分片 副本 负载均衡 等等 全部都隐藏了起来
+2.Elasticsearch的垂直扩容与水平扩容
+    两种扩容方案
+    垂直扩容  采购更强大的服务器  替换以前的服务器  成本较高 而且会有瓶颈
+    水平扩容  业界经常采用的方案   性能比较一般  很多的服务器组织在一起 就能构成强大的计算和储存能力
+    扩容对应用程序的透明性
+
+
+3.增加或者减少节点时的数据rebanlance
+    保持负载均衡  如果集群中的shard集群分布不合理  那么es会自动分配直到集群基本处于负载均衡状态
+4.master节点  master不承载所有的请求  所以不会是一个单点瓶颈
+    管理es集群的元数据  比如说索引 创建 删除  维护索引元数据  节点的增减  维护集群的元数据
+    默认情况下 会自定选择出一台节点 作为master节点
+5.节点平等的风分布式架构
+    节点对等 每个节点都能接受所有的请求 ,每个节点所做的功能都是一样的
+    自定请求路由
+    响应收集
+
+_shard&replica机制再次梳理以及单node环境中创建index图解
+1.shard&relica机制在数梳理
+    1)index包含多个shard --> primary shard
+    2)每个shard都是一个最小工作单元  承载部分数据 lucene实例 完整的建立索引和处理请求的能力--->每个shard都是一个lucene实例
+    3)在增减节点是  shard会自动在nodes中负载均衡
+    4)primary shard和replica shard 每个document肯定值存在于某一个primary shard以及对应的replica shard中 不可能存在于多个primary shard
+    5)replica shard是primary shard的副本  负责容错 以及承担读请求负载
+    6)primary shard的数量在创建索引的时候就固定了 replica shard的数量可以随时修改
+    7)primary shard的数量默认是5，replica默认是1  默认有10个shard  5个primary shard，5个replica shard
+    8)primary shard不能和自己的replica shard放在同一个节点上（否则节点宕机 primard shard和副本丢失  起不到容错的作用 但是可以和其他的primary shard的replica shard放在同一个节点上）
+2.图解单node环境下创建idnex是怎样的
+    1)单node环境下 创建一个index  有3个primary shard 3个replica shard
+    2)集群status是yellow
+    3)这个时候 只会讲3个primary shard分配到仅有一个node上去 另外3个replica shard是无法分配的
+    4)集群可以正常工作 但是一旦出现节点宕机  而且集群不可用 无法承接任何请求
+PUT /test_index
+{
+    "settings":{
+        "number_of_shards":3,
+        "number_of_replicas":1
+    }
+}
+
+两个node环境下replica shard是如何分配的
+1)replica shard 分配   3个rimary shard,3个replica shard,1 node
+2)primary  ---> replica同步
+3)读请求  primary/replica
+
+
+横向扩容过程  如何超出扩容极限  以及如何提升容错性
+1)primart&replca自动负载均衡  6个shard 3primary 3replica   每个node上会有相同的shard数量
+2)每个node有更少的shard  IO/CPU/Memory资源给每个shard分配更多  每个shard性能更好
+3)扩容的极限  6个sahrd(3 primary,3 replica)  最多扩容到6台机器，每个shard可以占用单台服务器的所有资源  性能最好
+4)超过扩容极限 动态修改replica数量 9个shard(3primary,6replica)，扩容到9台机器，比3台机器时，拥有3倍的读吞吐量
+5)3台机器下，9个shard(3primary,6 replica)  资源更少，但是容错性更好，最多容纳2台机器宕机，6个shard只能容纳1台机器宕机
+
+
+Elasticsearch容错机制 master选举 replica容错 数据恢复
+1)9shard，3node
+2)master node宕机  自动master选举 red  master节点上面的数据会丢失 cluster status = red   -->不是所有的primary shard都是active status
+    自动选举master另外一个node称为新的master 承担起master的责任
+3)replica容错,新master将replica提升为primary shard，yellow --->不是所有的replica都是active status
+4)重启宕机node,master copy replica到该node，使用原有的shard并同步宕机后的修改 green   --->primary shard和replica shard全齐了
