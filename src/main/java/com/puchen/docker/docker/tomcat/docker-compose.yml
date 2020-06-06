@@ -1,0 +1,13 @@
+version: '3'
+services:
+  tomcat1:
+    image: tomcat
+    container_name: tomcat1
+    ports:
+      - 9090:8080
+
+  tomcat2:
+    image: tomcat
+    container_name: tomcat2
+    ports:
+      - 9091:8080

@@ -1,0 +1,32 @@
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    sendfile        on;
+    
+    keepalive_timeout  65;
+    server {
+        listen       80;
+        server_name  192.168.232.134;
+        location / {
+            root   /usr/share/nginx/wwwroot/html81;
+            index  index.html index.htm;
+        }
+
+    }
+    server {
+        listen       9000;
+        server_name  192.168.232.134;
+        location / {
+            root   /usr/share/nginx/wwwroot/html9000;
+            index  index.html index.htm;
+        }
+
+    }
+}

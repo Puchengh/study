@@ -34,6 +34,9 @@ split:切片  逻辑切片  只是进行一个逻辑划分并没有真正的进�
 			  mapreduce.input.fileputformat.split.minsize 添加到mapred-site.xml
 	2)修改代码
 //		//设置切片的消息   单位是字节Byte
+
+
+
 修改最大值的带的切片的大小>块大小
 修改最小值的带的切片的大小<块大小
 //		FileInputFormat.setMinInputSplitSize(job, 640);

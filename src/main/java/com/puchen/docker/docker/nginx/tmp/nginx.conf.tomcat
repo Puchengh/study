@@ -1,0 +1,48 @@
+user  nginx;
+worker_processes  1;
+
+events {
+    worker_connections  1024;
+}
+
+http {
+    include       mime.types;
+    default_type  application/octet-stream;
+
+    sendfile        on;
+
+    keepalive_timeout  65;
+	
+	# 配置一个代理即 tomcat1 服务器
+	upstream tomcatServer1 {
+		server 192.168.232.134:9090;
+	}
+
+	# 配置一个代理即 tomcat2 服务器
+	upstream tomcatServer2 {
+		server 192.168.232.134:9091;
+	}
+
+	# 配置一个虚拟主机
+	server {
+		listen 80;
+		server_name admin.service.itoken.puchen.com;
+		location / {
+				# 域名 admin.service.itoken.funtl.com 的请求全部转发到 tomcat_server1 即 tomcat1 服务上
+				proxy_pass http://tomcatServer1;
+				# 欢迎页面，按照从左到右的顺序查找页面
+				index index.jsp index.html index.htm;
+		}
+	}
+
+	server {
+		listen 80;
+		server_name admin.web.itoken.puchen.com;
+
+		location / {
+			# 域名 admin.web.itoken.funtl.com 的请求全部转发到 tomcat_server2 即 tomcat2 服务上
+			proxy_pass http://tomcatServer2;
+			index index.jsp index.html index.htm;
+		}
+	}
+}

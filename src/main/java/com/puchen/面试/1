@@ -1,0 +1,76 @@
+1.Spark Streaming从Kafka中读取数据包括基于Receiver和Direct的方式，描述一下这2中方式
+Receiver方式是通过zookeeper来连接kafka队列，Direct方式是直接连接到kafka的节点上获取数据了。
+receiver从Kafka中获取的数据都是存储在Spark Executor的内存中的，然后Spark Streaming启动的job会去处理那些数据
+Direct方式,周期性地查询Kafka,处理数据的job启动时，就会使用Kafka来获取数据
+
+2.hive内部表和外部表的区别
+内部表数据由Hive自身管理，外部表数据由HDFS管理
+内部表数据存储的位置是hive.metastore.warehouse.dir   外部表数据的存储位置由自己制定；
+删除内部表会直接删除元数据（metadata）及存储数据；删除外部表仅仅会删除元数据，HDFS上的文件并不会被删除；
+对内部表的修改会将修改直接同步给元数据，而对外部表的表结构和分区进行修改，则需要修复
+
+3.Spark应用执行的的转换流程（这个回答不是很清楚）
+(1) 构建Spark Application的运行环境，启动SparkContext。
+(2) SparkContext向资源管理器（可以是Standalone、Mesos、Yarn）申请运行Executor资源。
+(3) 资源管理器分配Executor资源并启动ExecutorBackend，Executor运行情况将随着心跳发送到资源管理器上。心跳是周期性地发送给资源管理器的信息，以表示Executor仍然活着。
+(4) SparkContext通过DAGScheduler根据RDD依赖关系构建DAG图，再将DAG图分解成Stage，并把TaskSet发送给TaskScheduler。Executor向SparkContext申请Task，TaskScheduler将Task发放给Executor运行。
+(5) Task在Executor上运行，运行完释放资源。
+
+4.列举3个以上的runtime exception
+ SQLException：操作数据库异常
+IOException：输入输出异常
+ClassCastException：类型强制转换异常
+NullPointerException：空指针异常
+
+5.描述一下线程在执行过程中的几种状态
+(1)新生状态，当创建一个thread类的实例对象时。此线程进入新建状态
+(2)就绪状态  线程被启动，正在等待被分配给CPU时间片
+(3)运行状态 线程获得CPU资源正在执行任务RUN()方法，此时除非线程自动放弃资源或者优先级较高的线程进入，否则线程将一直运行到结束
+(4)阻塞状态 运行的线程由于某些原因不得不停止自己的运行的时候，便到了阻塞的状态，当原因消除时，进入就绪状态，重新排队
+(5)死亡状态 线程的最后一个阶段，一是运行完成，二是被强制性停止，
+
+6.简单说一下Oracle sql中drop delete truncate的区别
+delete和truncate都是删除表中的内容而不能删除表的结构，而drop则是删除表的结构和内容(表将不复存在)；
+delete可以删除整个表的数据也可以有选择性地删除某一条或多条数据，而truncate则是一次性删除整个表的数据；
+使用delete删除的表数据并没有真正被删掉，数据占用的表空间还存在，相当于Windows中将数据删除到回收站中，日后有需要还可以恢复；
+使用truncate删除的表数据会连同其占用的表空间一起直接被删掉，相当于Windows中使用del+shift键直接删除文件一样，无法恢复。
+
+7.数据库事务四大特性是什么
+原子性  原子性是指事务包含的所有操作要么全部成功，要么全部失败回滚
+一致性   一致性是指事务必须使数据库从一个一致性状态变换到另一个一致性状态，也就是说一个事务执行之前和执行之后都必须处于一致性状态
+隔离性   隔离性是当多个用户并发访问数据库时，比如操作同一张表时，数据库为每一个用户开启的事务，不能被其他事务的操作所干扰，多个并发事务之间要相互隔离
+持久性  持久性是指一个事务一旦被提交了，那么对数据库中的数据的改变就是永久性的，即便是在数据库系统遇到故障的情况下也不会丢失提交事务的操作。
+
+8.锁有哪些？select怎么设置排他锁
+mysql表级锁定，行级锁定和页级锁定。
+
+1.表级锁（表级锁一次会将整个表锁定，所可以很好的避免死锁问题）
+（1）锁定粒度大，锁冲突概率高、并发度低；
+（2）好处是不会出现死锁、开销小、获取锁和释放锁的速度很快；
+（3）使用表级锁定的主要是MyISAM，MEMORY，CSV等一些非事务性存储引擎，适用于以查询为主，少量更新的应用。
+2.行级锁
+（1）好处是锁定对象的颗粒度很小，发生锁冲突的概率低、并发度高；
+（2）缺点是开销大、加锁慢，行级锁容易发生死锁；
+（3）使用行级锁定的主要是InnoDB存储引擎、及分布式存储引擎NDBCluster等。适用于对事务完整性要求较高的系统。InnoDB支持行级锁(row-level locking)和表级锁，默认为行级锁。
+InnoDB行级锁类型
+1）共享锁：又称读锁，简单讲就是多个事务对同一数据进行共享一把锁，都能访问到数据，但是只能读不能修改。
+2）排他锁：又称写锁，排他锁就是不能与其他所并存，如一个事务获取了一个数据行的排他锁，其他事务就不能再获取该行的其他锁，只有获取排他锁的事务可以对数据进行读取和修改。
+
+select … for update
+
+
+TCP和UDP的区别和优缺点
+(1）ｔcp面向链接，UDP无链接
+(2）tcp发送的数据是可靠的，无差错的，及时的。udp不能保证这些
+(3)tcp只能是一对一的服务，udp可以是一对一，一对多，多对一，多对多
+
+select * from (select s.*,rownum rn from sxe s ) x where x.rn in (select min(rownum) from sxe group by username) order by id asc;
+
+
+
+
+
+表级锁
+粒度大 并发度低  锁冲突概率高  获取锁和释放锁速度快   开销小 不会出现死锁
+行级锁
+ 力度先  并发度高  锁冲突概率低  加锁慢 开销大 容易发生死锁d

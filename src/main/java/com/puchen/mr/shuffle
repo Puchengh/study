@@ -5,7 +5,7 @@
 分组  WritableComparator  分组就是一个比较的过程  按照key比较  只要返回0的就会认为是一组   如果不返回0 就划到下一组
 
 分区  将结果输出进行分类  Partition  默认实现是HashPartitioner
-
+d
 组件   Combiner组件  ：合并组件   小结果统计
 
 自定义类：mapreduce中如果想要自定义类作为传输的key或者value  那么自定义类必须实现序列化和反序列化
