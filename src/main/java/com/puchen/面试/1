@@ -74,3 +74,11 @@ select * from (select s.*,rownum rn from sxe s ) x where x.rn in (select min(row
 粒度大 并发度低  锁冲突概率高  获取锁和释放锁速度快   开销小 不会出现死锁
 行级锁
  力度先  并发度高  锁冲突概率低  加锁慢 开销大 容易发生死锁d
+ 
+ 
+ 
+Sort by 保证了每个reduce内部有序，reduce数量可以大于一，然后对结果merge再输出。
+Order by指全局一致，reduce数量=1，文件大的时候会造成长时间运行
+
+sql的执行顺序
+from--on--join--where--group by--having--select--distinct--order by--limit
