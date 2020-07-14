@@ -1,0 +1,150 @@
+修改网络 	 192.168.13.61:44480
+
+export -n https_proxy=http://192.168.13.61:44480
+
+export http_proxy=http://192.168.13.61:44480
+export https_proxy=http://192.168.13.61:44480
+
+vue环境搭建
+1下载node js
+设置代理 npm config set proxy=http://192.168.13.61:44480
+2 npm install -g cnpm --registry=https://registry.npm.taobao.org
+设置代理 cnpm config set proxy=http://192.168.13.61:44480
+3  全局使用vue-cli脚手架 cnpm install --global vue-cli
+
+git config --global url."https://".insteadOf git://
+
+npm cache clean --force
+
+git设置代理
+git config --global https.proxy http://192.168.13.61:44480
+
+git clone ssh://git@192.168.13.61:44480/github.com:PanJiaChen/vue-element-admin.git
+
+git config --global http.proxy http://192.168.13.61:44480
+
+es kinaner 地址 http://192.168.37.102:5601/app/kibana#/home
+
+es集群地址  192.168.37.102-104   elk_bigdata
+
+ftp://192.168.25.35   ftpuser/123456
+
+http://192.168.0.157:30014/SL_UM/HOME    review@sldev.com/Sinolife2008
+
+npm install echarts -S
+
+mysql 192.168.13.62 root/Sino2018.com
+
+bdms  192.168.25.35   hive/123456
+
+jk   http://192.168.16.14:8080/job/bd_fdsoc_vue-fd-ocs/  fdopr/fdopr2018
+
+https://www.cnblogs.com/swordfall/p/10301707.html
+https://www.cnblogs.com/swordfall/p/12880809.html
+https://www.cnblogs.com/swordfall/p/12869231.html
+https://www.cnblogs.com/swordfall/p/12857293.html
+
+SAP API官网地址：api.sap.com
+账户：yantao.xn@weaver.cn
+密码：yt127048..
+ 
+生产订单推送接口：
+https://api.sap.com/api/CO_PPINT_MFGORD_EXECT_REQ_OUT/documentation
+ 
+WSDL文件名：CO_PPINT_MFGORD_EXECT_REQ_OUT
+WSDL文件的用法：https://jingyan.baidu.com/article/2fb0ba40e968f400f2ec5ff5.html
+
+select * from (select course,
+row_number() over(PARTITION BY course order by score desc ) as rn
+from test) a
+where a.rn <=2
+
+select   st.stuid ID ,  st.stunm 姓名, cs.coursenm 课程名 ,sc.scores 成绩     from  student st, score sc ,courses cs
+where st.stuid = sc.stuid and sc.courseno = cs.courseno ;
+ 
+EXPLAIN
+select st.stuid 编号, st.stunm 姓名 ,
+Max(case c.coursenm when '大学语文' then s.scores else 0 end ) '大学语文',
+max(case c.coursenm when '新视野英语' then IFNULL(s.scores,0)else 0 end) '新视野英语',
+Max(case c.coursenm when '离散数学' then IFNULL(s.scores,0) ELSE 0 END) '离散数学',
+MAX(case c.coursenm when '概率论与数理统计' then IFNULL(s.scores,0) else 0 end) '概率论与数理统计',
+MAX(case c.coursenm  when '线性代数' then IFNULL(s.scores,0) else 0 END) '线性代数',
+MAX(case c.coursenm when '高等数学(一)' THEN IFNULL(s.scores,0) else 0 end) '高等数学(一)',
+MAX(case c.coursenm when '高等数学(二)' THEN IFNULL(s.scores,0) else 0 end) '高等数学(二)'
+from  student st 
+LEFT JOIN score s on st.stuid = s.stuid
+LEFT JOIN courses c on c.courseno = s.courseno
+GROUP BY st.stuid;
+
+EXPLAIN
+select   s.stuid 编号 , GROUP_CONCAT(courseno) 课程号 , GROUP_CONCAT(s.scores)  成绩  from score s GROUP BY  s.stuid
+
+EXPLAIN select * from test
+EXPLAIN select t.id,t.username,t.course,t.score from test t
+
+
+create PROCEDURE p1() -- 声明一个存储过程,begin和end之间就是sql语句的集合。
+BEGIN
+    insert into test VALUES(0,'张三', '历史', '50');
+    select * from test;
+END
+
+drop PRECISION p1
+
+SELECT * FROM information_schema.routines WHERE routine_name='p1';
+
+call p1;
+
+show PROCEDURE status
+
+
+
+explain
+select 
+r.s_id,t.s_name,r.c_num,r.total_score
+from student t
+INNER JOIN
+(select w.s_id,w.c_num,w.total_score from
+(select y.s_id,count(y.c_id) as c_num, sum(y.score) as total_score
+from 
+(
+select a.s_id as s_id,a.s_name as s_name,a.s_age as s_age,a.s_sex as s_sex,
+b.c_id as c_id,b.score as score,c.t_id as t_id,d.t_name as t_name
+from student a
+left join
+score  b on a.s_id=b.s_id
+left join
+course c on b.c_id=c.c_id
+left join
+teacher d on c.t_id=d.t_id)y
+group by s_id) w) r
+on 
+t.s_id = r.s_id
+
+Sort by 保证了每个reduce内部有序，reduce数量可以大于一，然后对结果merge再输出。
+Order by指全局一致，reduce数量=1，文件大的时候会造成长时间运行
+
+sql的执行顺序
+from--on--join--where--group by--having--select--distinct--order by--limit
+
+
+Intellij IDEA运行报command line is too long. shorten command line for xxx 解法
+<component name="PropertiesComponent">
+  ...
+ <property name="dynamic.classpath" value="true" />
+</component>
+
+1.2.1、hdfs与hbase数据存储的缺点
+目前数据存储有了HDFS与hbase，为什么还要额外的弄一个kudu呢?
+HDFS:使用列式存储格式Apache Parquet，Apache ORC，适合离线分析，不支持单条纪录级别的update操作，随机读写性能差
+HBASE:可以进行高效随机读写，却并不适用于基于SQL的数据分析方向，大批量数据获取时的性能较差。
+正因为HDFS与HBASE有上面这些缺点，KUDU较好的解决了HDFS与HBASE的这些缺点，它不及HDFS批处理快，也不及HBase随机读写能力强，
+但是反过来它比HBase批处理快（适用于OLAP的分析场景），
+而且比HDFS随机读写能力强（适用于实时写入或者更新的场景），这就是它能解决的问题。
+
+
+
+
+
+
+
