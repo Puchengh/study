@@ -1,0 +1,18 @@
+统计单词统计的次数，
+先创建一个流  对文件进行读取
+创建一个容器  盛放读取的单词  可变的 map
+    BufferedReader br = new BufferedReader(new FileReader("D"\\data\word.txt));
+    Map<String,Integer>  map = new HashMap<String,Integer>();
+    Sytring line=null;
+    while((line=br.readLine())!=null){
+     String[] split = line.split("\t");
+     //将数组中的每个单词去除放在map中
+     for(String word:split){
+         //需要判断如果不存在 则
+         if(map.containsKey(key)){
+             map.put(word,1);
+         }else{
+             map.put(word,map.get(word))
+         }
+     }
+    }

@@ -1,0 +1,79 @@
+元数据的管理：
+    元数据: 1抽象目录树，2数据与块的映射  3数据块的存储节点
+    内存： 1 2 3
+    磁盘：1 2
+    /home/hadoop/data/hadoopdata目录下有三个文件夹
+        data：数据的正式存储目录  datanode存储数据的存储目录
+        name:namenoede存储元数据的目录
+            这里面的文件分为4类：
+                1.历史日志文件  日志文件：记录客户端对元数据操作的日志  只记录操作  edits开头的文件
+                2.正在编辑的日志文件 ：目前对元数据修改的操作修改的文件  edits_inprogress开头的文件
+                3.镜像文件：fsimage开头的文件   真实的元数据信息进过序列化之后的文件  在集群启动的时候会加载这个文件
+                4.seen_txid 存的是合并点记录文件  记录的是下一次需要合并的日志文件的起始偏移量
+        nm-loacal-dir：HDFS本地缓存
+
+    真实的硬盘上存储的完整的元数据：fsimage+edits_inprogress  正在编辑的日志文件
+        重新格式化的时候只有 fsimage开头的文件  格式化的镜像文件  以及.md5w文件  还有一个合并点的文件  seen_txid = 0
+        启动集群的时候会多一个  edits_inprogress开头的文件  正在编辑的日志文件
+
+元数据写入的时候：
+    内存中的元数据
+    磁盘上的元数据：edits文件 = 历史的日志文件+正在编辑的日志文件  fsimage文件   元数据的合并是有secondarynamenode完成的
+        hadoop fs mkdir/put/rename
+            1.先将操作写入到磁盘日志文件中
+            2.将操作写入到内存中，修改内存中的元数据  修改内存中真实的元数据 修改的是目录结构
+    无论什么时候 内存中写的元数据是最新的最完整的元数据
+    如果fsimage不和日志文件进行合并  fsimage和内存元数据差别越来越大  所有都是由secondarynamenode完成的
+
+
+元数据合并的过程：
+    secondarynamenode 保持通信
+        触发合并的条件  ：
+                1.时间节点 两次合并之间的间隔  3600s=1h
+                hdfs-deault.xml----dfs.namenode.checkpoint.period  = 3600
+                2.元数据条数 100W条
+                hdfs-deault.xml----dfs.namenode.checkpoint.txns = =1000000
+         两个触发条件都会触发checkpoint过程
+
+    真实的checkpoint过程
+        1.snn向namenode发送请求，请求是否需要checkpoint
+        2.namenode向snn响应需要checkpoint（时间一小时或者数据100W）
+        3.请求元数据合并checkpoint
+        4.将正在编辑日志的文件状态切换为完成的状态--回滚  同时生成一个新的正在编辑的日志文件edits_inprogress.new 接收客户端的请求
+        5.snn将历史日志文件和fsimage拉去到自己的节点上
+            注意：如果是第一次checkpoint，那么这次去拉去的日志文件是合并点的日志文件到最新回滚的日志文件区间的所有的日志文件
+        6.将edits和fsimage加载到内存中进行和
+        7.snn将合并完成的fsimage文件发送给namenode  合并完成发送的文件名：fsimage.checkpoint
+        8.namenode将fsimage.checkpoint进行重命名 为fsimage，替换到原来的fsimage文件  snn也保存了一个fsimage文件
+
+    合并过程：根据edits的操作日志改变fsimage的元数据信息
+
+    secondarynamenode也会保存一份fsimage文件 同时会固化到磁盘一份文件  原因是为namenode做备份 以防 namenode宕机元数据丢失进行帮助namenode恢复
+    如果不是第一次进行checkpoint的时候 snn只需要拉去合并点记录之后的日志文件就可以了
+
+    在没有达到checkpoint过程中集群关闭了，如果正常关闭 内存中的元数据会固化到磁盘中一份，关闭集群的是保证磁盘上的元数据和内存中的一致，如果不是正常关闭会丢失
+
+    查看edits文件信息
+    hdfs oev -i  edits_00000001-0000003 -0 edits.xml
+
+namenode的作用：
+    1.保存元数据
+    2.处理客户端的读写请求
+    3.负责分配数据块的存储节点
+    4.进行负载均衡
+secondarynamenode的作用：
+    1.帮助namenode做元数据备份  帮助namenode进行数据恢复
+    2.帮助namenode进行元数据合并  进行checkpoint  减轻namenode压力
+datanode的作用：
+    1.用来存储数据块
+    2.处理正真的读写
+    3.定期向namenode发送心跳报告（状态，块的位置信息）
+块的位置信息：
+    数据块存储在datanmode上  但是并不知道这个块属于那个文件  只有namenode才知道哪个块属于那个文件
+    namenode记录的磁盘中的元数据信息不包含数据块存储位置的信息，但是包含文件和数据块的对应关系，
+        数据块的存储信息会先存为一个空的列表   在datanode向namenode发送块的报告的时候会把对应块的存储节点加到列表中
+
+
+
+
+

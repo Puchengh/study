@@ -68,8 +68,6 @@ select * from (select s.*,rownum rn from sxe s ) x where x.rn in (select min(row
 
 
 
-
-
 表级锁
 粒度大 并发度低  锁冲突概率高  获取锁和释放锁速度快   开销小 不会出现死锁
 行级锁
